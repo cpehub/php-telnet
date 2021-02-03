@@ -46,8 +46,8 @@ $client = new Clent($ip, $port, $timelimit, $logger);
 $client->setLogger($logger);
 ```
 
-##Class synopsis
-###Skrip42\Telnet\Client class synopsis:
+## Class synopsis
+### Skrip42\Telnet\Client class synopsis:
 ```php
 Client {
     /**
@@ -124,7 +124,7 @@ Client {
 }
 ```
 
-###Skrip42\Telnet\Components\CommandSequence class synopsis:
+### Skrip42\Telnet\Components\CommandSequence class synopsis:
 ```php
 CommandSequence {
 
@@ -169,7 +169,7 @@ CommandSequence {
     public function compile() : string;
 }
 ```
-###Skrip42\Telnet\Components\Command constants
+### Skrip42\Telnet\Components\Command constants
 ```php
 Command
 {
@@ -193,7 +193,7 @@ Command
 ```
 see https://tools.ietf.org/html/rfc854 to detail
 
-###Skrip42\Telnet\Components\Option  constants
+### Skrip42\Telnet\Components\Option  constants
 ```php
 Option
 {
@@ -219,7 +219,7 @@ Option
     const ENVIRONMENT         = 0x27;
 }
 ```
-###Skrip42\Telnet\Components\Printer constants
+### Skrip42\Telnet\Components\Printer constants
 ```php
 Printer
 {
