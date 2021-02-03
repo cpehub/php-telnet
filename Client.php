@@ -61,7 +61,7 @@ class Client
         return $this;
     }
 
-    public function login($login, $password, $promtPattern = null)// : CommandSequence
+    public function login(string $login, string $password, string $promtPattern = null) : CommandSequence
     {
         //set telnet connetion options
         $sequense = new CommandSequence();
@@ -100,7 +100,7 @@ class Client
         $sequense = new CommandSequence();
         $sequense->addText($password, Printer::CR);
         $this->sendSequence($sequense);
-        $this->awaitPrompt($promtPattern ?? $this->promtPattern);
+        return $this->awaitPrompt($promtPattern ?? $this->promtPattern);
     }
 
     public function sendMessage(string $message, string $promtPattern = null, int $timelimit = null) : string
