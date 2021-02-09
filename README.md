@@ -9,7 +9,7 @@ telnet client for PHP
 .....
 use Skrip42\Telnet\Client;
 .....
-$client = new Clent($ip); //create client
+$client = new Client($ip); //create client
 $client->setPromtPattern('~\w+(>|#)$~'); //add await pattern
 $client->login($login, $password); //call login procedure
 
