@@ -1,7 +1,7 @@
 <?php
-namespace Skrip42\Telnet\Components;
+namespace Cpehub\Telnet\Components;
 
-use Skrip42\Telnet\Components\Command;
+use Cpehub\Telnet\Components\Command;
 
 class CommandSequence
 {
