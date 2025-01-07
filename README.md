@@ -7,7 +7,7 @@ telnet client for PHP
 ## base usage:
 ```php
 .....
-use Skrip42\Telnet\Client;
+use Cpehub\Telnet\Client;
 .....
 $client = new Client($ip); //create client
 $client->setPromtPattern('~\w+(>|#)$~'); //add await pattern
@@ -47,7 +47,7 @@ $client->setLogger($logger);
 ```
 
 ## Class synopsis
-### Skrip42\Telnet\Client class synopsis:
+### Cpehub\Telnet\Client class synopsis:
 ```php
 Client {
     /**
@@ -81,7 +81,7 @@ Client {
      *
      * @return CommandSequence (see Skrip42\Telet\Components\CommandSequence class synopsis)
      */
-    public function login(string $login, string $password, string $promtPattern = null) : Skrip42\Telnet\Components\CommandSequence;
+    public function login(string $login, string $password, string $promtPattern = null) : Cpehub\Telnet\Components\CommandSequence;
 
 
     /**
@@ -100,7 +100,7 @@ Client {
      *
      * @param CommandSequence $swquence (see Skrip42\Telet\Components\CommandSequence class synopsis)
      */
-    public function sendSequence(Skrip42\Telnet\Components\CommandSequence $sequence);
+    public function sendSequence(Cpehub\Telnet\Components\CommandSequence $sequence);
 
     /**
      * await specific command sequence from response and return response command sequence
@@ -108,9 +108,9 @@ Client {
      * @param CommandSequence $sequence (see Skrip42\Telet\Components\CommandSequence class synopsis)
      * @param int $timelimit max awaiting time (optional)
      *
-     * @return CommandSequence (see Skrip42\Telnet\Components\CommandSequence class synopsis)
+     * @return CommandSequence (see Cpehub\Telnet\Components\CommandSequence class synopsis)
      */
-    public function awaitSequence(Skrip42\Telnet\Components\CommandSequence $sequence, int $timelimit = null) : Skrip42\Telnet\Components\CommandSequence;
+    public function awaitSequence(Cpehub\Telnet\Components\CommandSequence $sequence, int $timelimit = null) : Cpehub\Telnet\Components\CommandSequence;
 
     /**
      * await specific promt text from response and return response command sequence
@@ -118,13 +118,13 @@ Client {
      * @param string $promtPattern  await pattern (optional)
      * @param int $timelimit max awaiting time (optional)
      *
-     * @return CommandSequence (see Skrip42\Telnet\Components\CommandSequence class synopsis)
+     * @return CommandSequence (see Cpehub\Telnet\Components\CommandSequence class synopsis)
      */
-    public function awaitPrompt(string $promtPattern = null, int $timeLimit = null) : Skrip42\Telnet\Components\CommandSequence;
+    public function awaitPrompt(string $promtPattern = null, int $timeLimit = null) : Cpehub\Telnet\Components\CommandSequence;
 }
 ```
 
-### Skrip42\Telnet\Components\CommandSequence class synopsis:
+### Cpehub\Telnet\Components\CommandSequence class synopsis:
 ```php
 CommandSequence {
 
@@ -136,8 +136,8 @@ CommandSequence {
     /**
      * add command to sequence
      *
-     * @param int $command telnet command (see Skrip42\Telnet\Components\Command constants)
-     * @param int $options telnet options (see Skrip42\Telnet\Components\Command constants)
+     * @param int $command telnet command (see Cpehub\Telnet\Components\Command constants)
+     * @param int $options telnet options (see Cpehub\Telnet\Components\Command constants)
      */
     public function addCommand(int $command, int $option = null) : self;
 
@@ -151,7 +151,7 @@ CommandSequence {
     /**
      * add option to sequence
      *
-     * @param int $options telnet options (see Skrip42\Telnet\Components\Command constants)
+     * @param int $options telnet options (see Cpehub\Telnet\Components\Command constants)
      * @param string $data option data
      */
     public function addOption(int $option, string $data) : self;
@@ -169,7 +169,7 @@ CommandSequence {
     public function compile() : string;
 }
 ```
-### Skrip42\Telnet\Components\Command constants
+### Cpehub\Telnet\Components\Command constants
 ```php
 Command
 {
@@ -179,7 +179,7 @@ Command
     const BREAK             = 0xF3;
     const INTERRUPT_PROCESS = 0xF4;
     const ABOUT_OUTPUT      = 0xF5;
-    const ARE_TYOU_THERE    = 0xF6;
+    const ARE_YOU_THERE    = 0xF6;
     const ERASE_CHARACTER   = 0xF7;
     const ERASE_LINE        = 0xF8;
     const GO_AHEAD          = 0xF9;
@@ -193,7 +193,7 @@ Command
 ```
 see https://tools.ietf.org/html/rfc854 to detail
 
-### Skrip42\Telnet\Components\Option  constants
+### Cpehub\Telnet\Components\Option  constants
 ```php
 Option
 {
@@ -219,7 +219,7 @@ Option
     const ENVIRONMENT         = 0x27;
 }
 ```
-### Skrip42\Telnet\Components\Printer constants
+### Cpehub\Telnet\Components\Printer constants
 ```php
 Printer
 {

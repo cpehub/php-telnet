@@ -1,5 +1,5 @@
 <?php
-namespace Skrip42\Telnet\Components;
+namespace Cpehub\Telnet\Components;
 
 class Command
 {
@@ -22,7 +22,7 @@ class Command
      */
     const ABOUT_OUTPUT      = 0xF5;
     /** Отправляет обратно ответ терминала, состоящий из печатных символов. */
-    const ARE_TYOU_THERE    = 0xF6;
+    const ARE_YOU_THERE    = 0xF6;
     /** Получатель должен удалить предыдущий символ, если это возможно. */
     const ERASE_CHARACTER   = 0xF7;
     /**
