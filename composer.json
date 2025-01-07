@@ -1,23 +1,26 @@
 {
-    "name":"skrip42/php-telnet",
-    "descrption":"php telnet client",
-    "homepage":"https://github.com/skrip42/php-telnet",
-    "version":"v1.0.0",
-    "license":"MIT",
-    "minimum-stability":"dev",
-    "require":{
-        "php":"^7.1"
+    "name": "cpehub/php-telnet",
+    "description": "PHP Telnet Client",
+    "homepage": "https://github.com/cpehub/php-telnet",
+    "version": "v1.0.0",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "require": {
+        "php": "^8.2"
     },
     "authors": [
         {
             "name": "skrip42",
             "email": "skrip42@gmail.com"
+        },
+        {
+            "name": "CPEHub.io",
+            "email": "contato@cpehub.io"
         }
     ],
     "autoload": {
         "psr-4": {
-            "Skrip42\\Telnet\\":""
+            "Cpehub\\Telnet\\": ""
         }
     }
 }
-

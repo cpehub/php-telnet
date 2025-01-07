@@ -1,5 +1,5 @@
 <?php
-namespace Skrip42\Telnet\Exceptions;
+namespace Cpehub\Telnet\Exceptions;
 
 use Exception;
 

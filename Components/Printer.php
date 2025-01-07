@@ -1,5 +1,5 @@
 <?php
-namespace Skrip42\Telnet\Components;
+namespace Cpehub\Telnet\Components;
 
 class Printer
 {
