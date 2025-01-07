@@ -1,8 +1,8 @@
 # php-telnet
 telnet client for PHP
 
-## install:
-- run composer require skrip42/php-telnet
+## installation
+- Execute `composer require cpehub/php-telnet`
 
 ## base usage:
 ```php
