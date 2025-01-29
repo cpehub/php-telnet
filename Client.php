@@ -11,7 +11,7 @@ use Cpehub\Telnet\Exceptions\TelnetException;
 
 class Client
 {
-    const BYTE_READ    = 4096;  //4kb
+    const BYTE_READ = 4096;  //4kb
     const READ_TIMEOUT = 10000; //10ms
 
     private $socket;
@@ -47,34 +47,34 @@ class Client
         socket_close($this->socket);
     }
 
-    public function setPromptPattern(string $promptPattern) : self
+    public function setPromptPattern(string $promptPattern): self
     {
         $this->promptPattern = $promptPattern;
         return $this;
     }
 
-    public function setLogger(LoggerInterface $logger) : self
+    public function setLogger(LoggerInterface $logger): self
     {
         $this->setLogger($logger);
         return $this;
     }
 
-    public function login(string $login, string $password, string $promptPattern = null) : CommandSequence
+    public function login(string $login, string $password, string $promptPattern = null): CommandSequence
     {
         //set telnet connection options
         $sequence = new CommandSequence();
         $sequence
-            ->addCommand(Command::DO, Option::SUPPRESS_GO_AHEAD)
+            ->addCommand(Command::DO , Option::SUPPRESS_GO_AHEAD)
             ->addCommand(Command::WILL, Option::TERMINAL_TYPE)
             ->addCommand(Command::WILL, Option::WINDOW_SIZE)
             ->addCommand(Command::WILL, Option::TERMINAL_SPEED)
             ->addCommand(Command::WILL, Option::REMOTE_FLOW_CONTROL)
             ->addCommand(Command::WILL, Option::TERMINAL_LINEMODE)
             ->addCommand(Command::WILL, Option::ENVIRONMENT)
-            ->addCommand(Command::DO, Option::STATUS)
+            ->addCommand(Command::DO , Option::STATUS)
             ->addCommand(Command::WILL, Option::X_DISPLAY_LOCATION);
         $this->sendSequence($sequence);
-        
+
         //get telnet response
         $sequence = new CommandSequence();
         $sequence->addCommand(Command::DONT, Option::X_DISPLAY_LOCATION);
@@ -83,8 +83,8 @@ class Client
         //enable authorization
         $sequence = new CommandSequence();
         $sequence
-            ->addCommand(Command::DO, Option::SUPPRESS_GO_AHEAD)
-            ->addCommand(Command::WILL, Option::ECHO);
+            ->addCommand(Command::DO , Option::SUPPRESS_GO_AHEAD)
+            ->addCommand(Command::WILL, Option::ECHO );
         $this->sendSequence($sequence);
 
         //set login
@@ -103,7 +103,7 @@ class Client
         return $this->awaitPrompt($promptPattern ?? $this->promptPattern);
     }
 
-    public function sendMessage(string $message, string $promptPattern = null, int $timelimit = null) : string
+    public function sendMessage(string $message, string $promptPattern = null, int $timelimit = null): string
     {
         if (empty($timelimit)) {
             $timelimit = $this->timelimit;
@@ -120,6 +120,13 @@ class Client
         return $result->getText();
     }
 
+    public function sendLastMessage(string $message): void
+    {
+        $sequence = new CommandSequence();
+        $sequence->addText($message, Printer::CR);
+        $this->sendSequence($sequence);
+    }
+
     public function sendSequence(CommandSequence $sequence)
     {
         if (!empty($this->logger)) {
@@ -128,7 +135,7 @@ class Client
         socket_write($this->socket, $sequence->compile());
     }
 
-    public function awaitSequence(CommandSequence $sequence, int $timelimit = null) : CommandSequence
+    public function awaitSequence(CommandSequence $sequence, int $timelimit = null): CommandSequence
     {
         if (empty($timelimit)) {
             $timelimit = $this->timelimit;
@@ -139,7 +146,8 @@ class Client
         $ep = 0;
         $counter = 0;
         socket_set_nonblock($this->socket);
-        while (($ep = strpos($this->buffer, $needle, 0)) === false
+        while (
+            ($ep = strpos($this->buffer, $needle, 0)) === false
             && $counter < ($timelimit / self::READ_TIMEOUT)
         ) {
             usleep(self::READ_TIMEOUT);
@@ -169,7 +177,7 @@ class Client
         return $sequence;
     }
 
-    public function awaitPrompt(string $promptPattern = null, int $timelimit = null) : CommandSequence
+    public function awaitPrompt(string $promptPattern = null, int $timelimit = null): CommandSequence
     {
         if (empty($promptPattern)) {
             $promptPattern = $this->promptPattern;
@@ -182,7 +190,8 @@ class Client
         $counter = 0;
         $match = [];
         socket_set_nonblock($this->socket);
-        while (!preg_match($promptPattern, $this->buffer, $match, PREG_OFFSET_CAPTURE)
+        while (
+            !preg_match($promptPattern, $this->buffer, $match, PREG_OFFSET_CAPTURE)
             && $counter < ($timelimit / self::READ_TIMEOUT)
         ) {
             usleep(self::READ_TIMEOUT);
