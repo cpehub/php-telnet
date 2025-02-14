@@ -41,10 +41,14 @@ class Client
 
     public function __destruct()
     {
-        $sequence = new CommandSequence();
-        $sequence->addText('exit');
-        $this->sendSequence($sequence);
-        socket_close($this->socket);
+        try{
+            socket_close($this->socket);
+        }catch(\Throwable $e){
+            if(is_null($this->logger)){
+                return;
+            }
+            $this->logger->warning("Socket was closed before the class got destructed");
+        }
     }
 
     public function setPromptPattern(string $promptPattern): self
