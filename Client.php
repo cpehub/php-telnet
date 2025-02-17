@@ -42,7 +42,9 @@ class Client
     public function __destruct()
     {
         try{
-            socket_close($this->socket);
+            if(is_resource($this->socket) && $this->socket instanceof \Socket){
+                socket_close($this->socket);
+            }
         }catch(\Throwable $e){
             if(is_null($this->logger)){
                 return;
