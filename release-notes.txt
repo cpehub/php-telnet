@@ -33,8 +33,15 @@ Tooling/tests
   cleancode/controversial rulesets are excluded to keep noise low. Wired up as a
   "composer phpmd" script, included in "composer check", and run by a dedicated
   phpmd CI workflow. Inherent protocol complexity (IAC parsing, the RFC 1143
-  state machine, the client facade) is documented with annotated
-  @SuppressWarnings rather than by lowering thresholds.
+  state machine, the client facade) is handled by raised thresholds in phpmd.xml
+  rather than in-code @SuppressWarnings, because PHPStan rejects the latter as an
+  invalid PHPDoc tag value.
+- Set "prefer-stable": true and pinned config.platform.php to 8.2. With
+  "minimum-stability": dev and no prefer-stable, Composer had resolved transitive
+  Symfony dev branches (e.g. symfony/var-exporter 8.2.x-dev) that require PHP
+  8.4+, breaking "composer install" on the PHP 8.3 CI runners. Dev deps now
+  resolve to stable tags compatible with the library's PHP 8.2 floor, and the
+  pinned platform keeps local resolution honest against that floor.
 
 
 v2.0.0 (2026-07-07)
