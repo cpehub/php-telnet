@@ -2,35 +2,48 @@
 namespace Cpehub\Telnet\Components;
 
 use Cpehub\Telnet\Components\Command;
+use Cpehub\Telnet\Exceptions\ProtocolException;
 
 class CommandSequence
 {
-    private $sequense = [];
+    private $sequence = [];
 
-    public function __construct(string $input = null)
+    public function __construct(?string $input = null)
     {
         if (is_null($input)) {
             return;
         }
+        $length = strlen($input);
         $text = '';
-        // $option = [];
-        for ($i = 0; $i < strlen($input); $i++) {
+        for ($i = 0; $i < $length; $i++) {
             //if command
             if ($input[$i] == chr(Command::IAC)) {
-                if (!empty($text)) {
+                if ($text !== '') {
                     $this->addText($text); //flush current text
                     $text = '';
+                }
+                if ($i + 1 >= $length) {
+                    throw new ProtocolException('Truncated telnet command: dangling IAC at end of input.');
                 }
                 $i++;
 
                 if ($input[$i] === chr(Command::SB)) { //if option
+                    if ($i + 1 >= $length) {
+                        throw new ProtocolException('Truncated subnegotiation: missing option byte after IAC SB.');
+                    }
                     $option = $input[++$i];
                     $data = '';
-                    while ($input[++$i] != chr(Command::IAC)) {
+                    while (true) {
+                        if ($i + 1 >= $length) {
+                            throw new ProtocolException('Unterminated subnegotiation: missing IAC SE.');
+                        }
+                        if ($input[++$i] === chr(Command::IAC)) {
+                            break;
+                        }
                         $data .= $input[$i];
                     }
                     $this->addOption(ord($option), $data);
-                    $i++;
+                    $i++; //consume the SE following IAC
                 } elseif (in_array( //if WILL,WONT,DO,DONT command
                     $input[$i],
                     [
@@ -41,6 +54,9 @@ class CommandSequence
                     ],
                     true
                 )) {
+                    if ($i + 1 >= $length) {
+                        throw new ProtocolException('Truncated negotiation command: missing option byte.');
+                    }
                     $this->addCommand(ord($input[$i]), ord($input[++$i]));
                 } else { //other command
                     $this->addCommand(ord($input[$i]));
@@ -49,31 +65,31 @@ class CommandSequence
                 $text .= $input[$i]; //if text
             }
         }
-        if (!empty($text)) {
+        if ($text !== '') {
             $this->addText($text); //flush text
         }
     }
 
 
-    public function addCommand(int $command, int $option = null) : self
+    public function addCommand(int $command, ?int $option = null) : self
     {
         if (!is_null($option)) {
-            $this->sequense[] = [Command::IAC, $command, $option];
+            $this->sequence[] = [Command::IAC, $command, $option];
         } else {
-            $this->sequense[] = [Command::IAC, $command];
+            $this->sequence[] = [Command::IAC, $command];
         }
         return $this;
     }
 
     public function addText(...$parts) : self
     {
-        $this->sequense[] = $parts;
+        $this->sequence[] = $parts;
         return $this;
     }
 
     public function addOption(int $option, string $data) : self
     {
-        $this->sequense[] = [
+        $this->sequence[] = [
             Command::IAC,
             Command::SB,
             $option,
@@ -86,13 +102,13 @@ class CommandSequence
 
     public function getSequence()
     {
-        return $this->sequense;
+        return $this->sequence;
     }
 
     public function getText() : string
     {
         $result = '';
-        foreach ($this->sequense as $sequence) {
+        foreach ($this->sequence as $sequence) {
             if (is_numeric($sequence[0])) {
                 continue;
             }
@@ -111,7 +127,7 @@ class CommandSequence
     public function dump() : string
     {
         $resultStrings = [];
-        foreach ($this->sequense as $sequence) {
+        foreach ($this->sequence as $sequence) {
             if (!is_numeric($sequence[0])) {
                 $resultStrings[] = implode('', $sequence);
                 continue;
@@ -132,7 +148,7 @@ class CommandSequence
     public function compile() : string
     {
         $compiledSequence = '';
-        foreach ($this->sequense as $sequence) {
+        foreach ($this->sequence as $sequence) {
             foreach ($sequence as $command) {
                 if (is_numeric($command)) {
                     $compiledSequence .= chr($command);

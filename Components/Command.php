@@ -3,54 +3,60 @@ namespace Cpehub\Telnet\Components;
 
 class Command
 {
-    /** Завершает согласование, начатое командой SB. */
+    /** End of subnegotiation parameters (terminates a sequence started by SB). */
     const SE                = 0xF0;
-    /** Нет операции. */
+    /** No operation. */
     const NOP               = 0xF1;
     /**
-     * Синхронизация (Synch) обмена данными.
-     * Эта команда всегда сопровождается TCP Urgent notification.
-     * */
+     * Data Mark: the synch marker in the data stream.
+     * This command is always accompanied by a TCP Urgent notification.
+     */
     const DATA_MARK         = 0xF2;
-    /** Нажата кнопка «Break» или «Attention». */
+    /** The "Break" or "Attention" key was pressed. */
     const BREAK             = 0xF3;
-    /** Приостанавливает, прерывает, аварийно прекращает или завершает процесс. */
+    /** Suspend, interrupt, abort or terminate the running process. */
     const INTERRUPT_PROCESS = 0xF4;
     /**
-     * Подавление вывода текущего процесса.
-     * Также отправляет сигнал Synch пользователю.
+     * Abort Output: suppress the output of the current process.
+     * Also sends a Synch signal to the user.
+     */
+    const ABORT_OUTPUT      = 0xF5;
+    /**
+     * Abort Output.
+     *
+     * @deprecated Misspelled historical alias. Use {@see Command::ABORT_OUTPUT} instead.
      */
     const ABOUT_OUTPUT      = 0xF5;
-    /** Отправляет обратно ответ терминала, состоящий из печатных символов. */
-    const ARE_YOU_THERE    = 0xF6;
-    /** Получатель должен удалить предыдущий символ, если это возможно. */
+    /** Are You There: request a visible response from the terminal. */
+    const ARE_YOU_THERE     = 0xF6;
+    /** Erase Character: the receiver should delete the previous character if possible. */
     const ERASE_CHARACTER   = 0xF7;
     /**
-     * Стереть последнюю введённую строку, то есть все данные,
-     * полученные после последнего перевода строки.
+     * Erase Line: delete the last entered line, i.e. all data
+     * received since the last new line.
      */
     const ERASE_LINE        = 0xF8;
-    /** Ожидается передача данных. */
+    /** Go Ahead: the other end may now transmit. */
     const GO_AHEAD          = 0xF9;
-    /** Начало согласования опции, требующего передачи параметров. */
+    /** Begin subnegotiation of an option that requires parameters. */
     const SB                = 0xFA;
     /**
-     * Указывает на желание исполнять или подтверждает,
-     * что сейчас исполняется указанная опция.
+     * Indicates the desire to begin performing, or confirms that it is now
+     * performing, the indicated option.
      */
     const WILL              = 0xFB;
-    /** Указывает на отказ начать или продолжить исполнять указанную опцию. */
+    /** Indicates the refusal to begin or to continue performing the indicated option. */
     const WONT              = 0xFC;
     /**
-     * Запрос на то, чтобы другая сторона исполнила
-     * или подтвердила исполнение указанной опции.
+     * Requests that the other party begin performing, or confirms that it is
+     * expected to perform, the indicated option.
      */
     const DO                = 0xFD;
     /**
-     * Требование на то, чтобы другая сторона остановила исполнение
-     * или подтвердила то, что указанная опция более не исполняется.
+     * Requests that the other party stop performing, or confirms that it is
+     * no longer performing, the indicated option.
      */
     const DONT              = 0xFE;
-    /** Interpret as Command. */
+    /** Interpret As Command. */
     const IAC               = 0xFF;
 }
