@@ -15,6 +15,7 @@
         <include>
             <directory>Components</directory>
             <directory>Protocol</directory>
+            <directory>Transport</directory>
             <directory>Exceptions</directory>
             <file>Client.php</file>
         </include>
