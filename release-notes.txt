@@ -6,7 +6,7 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
-v2.1.0 (unreleased)
+v2.1.0 (2026-07-07)
 -------------------
 
 Features
