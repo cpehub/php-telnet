@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<ruleset name="php-telnet"
+         xmlns="http://pmd.sf.net/ruleset/1.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0
+                             http://pmd.sf.net/ruleset_xml_schema.xsd"
+         xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+    <description>
+        Design and complexity ruleset for cpehub/php-telnet.
+        Style is handled by PHPCS (PSR-12), types by PHPStan, behaviour by PHPUnit;
+        PHPMD only covers the design/complexity axis (codesize + design). Naming and
+        unused-code rules are intentionally omitted (already covered by PHPStan), as are
+        the opinionated cleancode/controversial rulesets.
+
+        A few thresholds are raised above their defaults for the protocol core. The IAC
+        byte scanner (CommandSequence::__construct), the wire-protocol state machine
+        (TelnetParser::push) and the RFC 1143 Q-Method negotiator (OptionNegotiator)
+        carry complexity that is inherent to the telnet grammar: the branch/state count
+        is the format's, and breaking it up would hide the parsing flow rather than
+        clarify it. The raised limits still catch genuinely unbounded growth; they are
+        not disabled. NOTE: PHPMD @SuppressWarnings annotations are avoided on purpose —
+        PHPStan rejects "@SuppressWarnings(PHPMD.*)" as an invalid PHPDoc tag value, so
+        the curation lives here instead of in the source.
+    </description>
+
+    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+        <properties>
+            <!-- CommandSequence::__construct = 17, TelnetParser::push = 16 (telnet grammar). -->
+            <property name="reportLevel" value="18" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/codesize.xml/NPathComplexity">
+        <properties>
+            <!-- CommandSequence::__construct = 808 (nested IAC/subnegotiation parsing). -->
+            <property name="minimum" value="1000" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/codesize.xml/ExcessiveClassComplexity">
+        <properties>
+            <!-- OptionNegotiator = 58 (RFC 1143 Q-Method state machine, 8 handlers). -->
+            <property name="maximum" value="70" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/codesize.xml/ExcessiveMethodLength" />
+    <rule ref="rulesets/codesize.xml/ExcessiveClassLength" />
+    <rule ref="rulesets/codesize.xml/ExcessiveParameterList" />
+    <rule ref="rulesets/codesize.xml/ExcessivePublicCount" />
+    <rule ref="rulesets/codesize.xml/TooManyFields" />
+    <rule ref="rulesets/codesize.xml/TooManyMethods" />
+    <rule ref="rulesets/codesize.xml/TooManyPublicMethods" />
+
+    <rule ref="rulesets/design.xml/CouplingBetweenObjects">
+        <properties>
+            <!-- Client is the facade wiring transport + parser + negotiator + events. -->
+            <property name="maximum" value="20" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/design.xml/EvalExpression" />
+    <rule ref="rulesets/design.xml/GotoStatement" />
+    <rule ref="rulesets/design.xml/ExitExpression" />
+    <rule ref="rulesets/design.xml/DevelopmentCodeFragment" />
+    <rule ref="rulesets/design.xml/EmptyCatchBlock" />
+    <rule ref="rulesets/design.xml/CountInLoopExpression" />
+    <!--
+        design.xml/NumberOfChildren and design.xml/DepthOfInheritance are intentionally
+        not referenced: exception/transport hierarchies legitimately have children/depth.
+    -->
+</ruleset>

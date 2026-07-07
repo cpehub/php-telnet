@@ -106,6 +106,19 @@ class Client
     }
 
     /**
+     * Whether the telnet session is still alive (peer connected), probed without
+     * sending or consuming any data. Returns false once the peer resets/closes.
+     *
+     * Unlike a plain handle-open check, this performs a zero-timeout select plus a
+     * non-destructive peek, so a half-closed/reset connection is detected reliably
+     * and any pending output is left intact for the next await/read.
+     */
+    public function isConnected(): bool
+    {
+        return $this->transport->isAlive();
+    }
+
+    /**
      * Perform the login procedure.
      *
      * Unlike 1.0.x this no longer scripts a fixed burst of WILL/DO and does not

@@ -163,6 +163,27 @@ final class StreamTransport implements TransportInterface
         return is_resource($this->stream);
     }
 
+    public function isAlive(): bool
+    {
+        if (!is_resource($this->stream)) {
+            return false;
+        }
+
+        // Not readable within a zero-timeout select => open but idle.
+        if (!$this->waitReadable(0)) {
+            return true;
+        }
+
+        // Readable: peek a byte without consuming it. An empty peek (or EOF)
+        // on a readable stream means the peer closed/reset the connection.
+        $peek = @stream_socket_recvfrom($this->stream, 1, STREAM_PEEK);
+        if ($peek === false || $peek === '' || feof($this->stream)) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * @return resource
      */

@@ -6,6 +6,44 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
+v2.1.0 (2026-07-07)
+-------------------
+
+Features
+- Added Client::isConnected() and TransportInterface::isAlive() — a non-consuming
+  select+peek liveness probe that reliably detects a reset/closed peer without
+  sending or consuming any data. Unlike a plain handle-open check, it performs a
+  zero-timeout select plus a non-destructive peek (MSG_PEEK / STREAM_PEEK), so a
+  half-closed/reset connection is detected and any pending output is left intact
+  for the next await/read.
+
+Tooling/tests
+- Fixed the PHPStan CI job, which failed because phpstan.neon excluded the
+  gitignored RFC/ directory that is absent from the CI checkout. The exclude is
+  now marked optional ("RFC (?)"), so PHPStan excludes it locally and ignores
+  its absence in CI.
+- Fixed "composer validate" failing on CI (exit 2) by regenerating the stale
+  composer.lock content-hash.
+- Removed the "version" field from composer.json; Packagist derives the version
+  from git tags. Clears the "composer validate" warning.
+- Added PHP 8.5 to the PHPUnit CI matrix (now 8.2, 8.3, 8.4, 8.5).
+- Added PHP Mess Detector (PHPMD) as a fourth quality gate covering the
+  design/complexity axis (codesize + design rulesets in phpmd.xml). Naming and
+  unused-code checks are intentionally left to PHPStan, and the opinionated
+  cleancode/controversial rulesets are excluded to keep noise low. Wired up as a
+  "composer phpmd" script, included in "composer check", and run by a dedicated
+  phpmd CI workflow. Inherent protocol complexity (IAC parsing, the RFC 1143
+  state machine, the client facade) is handled by raised thresholds in phpmd.xml
+  rather than in-code @SuppressWarnings, because PHPStan rejects the latter as an
+  invalid PHPDoc tag value.
+- Set "prefer-stable": true and pinned config.platform.php to 8.2. With
+  "minimum-stability": dev and no prefer-stable, Composer had resolved transitive
+  Symfony dev branches (e.g. symfony/var-exporter 8.2.x-dev) that require PHP
+  8.4+, breaking "composer install" on the PHP 8.3 CI runners. Dev deps now
+  resolve to stable tags compatible with the library's PHP 8.2 floor, and the
+  pinned platform keeps local resolution honest against that floor.
+
+
 v2.0.0 (2026-07-07)
 -------------------
 First substantial update since v1.0.2, released as a major version because of

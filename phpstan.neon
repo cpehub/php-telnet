@@ -9,4 +9,4 @@ parameters:
         - tests
     excludePaths:
         - vendor
-        - RFC
+        - RFC (?)
