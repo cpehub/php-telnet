@@ -6,6 +6,21 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
+v2.0.1 (unreleased)
+-------------------
+
+Tooling/tests
+- Fixed the PHPStan CI job, which failed because phpstan.neon excluded the
+  gitignored RFC/ directory that is absent from the CI checkout. The exclude is
+  now marked optional ("RFC (?)"), so PHPStan excludes it locally and ignores
+  its absence in CI.
+- Fixed "composer validate" failing on CI (exit 2) by regenerating the stale
+  composer.lock content-hash.
+- Removed the "version" field from composer.json; Packagist derives the version
+  from git tags. Clears the "composer validate" warning.
+- Added PHP 8.5 to the PHPUnit CI matrix (now 8.2, 8.3, 8.4, 8.5).
+
+
 v2.0.0 (2026-07-07)
 -------------------
 First substantial update since v1.0.2, released as a major version because of

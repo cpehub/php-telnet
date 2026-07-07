@@ -2,7 +2,6 @@
     "name": "cpehub/php-telnet",
     "description": "PHP Telnet Client",
     "homepage": "https://github.com/cpehub/php-telnet",
-    "version": "v2.0.0",
     "license": "MIT",
     "minimum-stability": "dev",
     "require": {
