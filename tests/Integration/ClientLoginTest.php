@@ -1,12 +1,12 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Integration;
 
 use Cpehub\Telnet\Client;
 use Cpehub\Telnet\Tests\Support\ScriptedTransport;
+use Cpehub\Telnet\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\AbstractLogger;
-use Stringable;
 
 class ClientLoginTest extends TestCase
 {
@@ -34,14 +34,7 @@ class ClientLoginTest extends TestCase
             ['expect' => "hunter2\r", 'send' => 'host$ '],
         ]);
 
-        $logger = new class extends AbstractLogger {
-            /** @var list<string> */
-            public array $lines = [];
-            public function log($level, string|Stringable $message, array $context = []): void
-            {
-                $this->lines[] = (string) $message;
-            }
-        };
+        $logger = new SpyLogger();
 
         $client = new Client('memory', 23, 500, $logger, $transport);
         $client->login('bob', 'hunter2', '~\$ $~');

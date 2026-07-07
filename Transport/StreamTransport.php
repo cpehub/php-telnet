@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Transport;
 
 use Cpehub\Telnet\Exceptions\ConnectionException;
@@ -116,6 +117,10 @@ final class StreamTransport implements TransportInterface
 
     public function read(int $length): string
     {
+        if ($length < 1) {
+            return '';
+        }
+
         $stream = $this->requireStream();
 
         $data = @fread($stream, $length);

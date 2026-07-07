@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Protocol\Event;
 
 /**

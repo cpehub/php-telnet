@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Protocol;
 
 use Cpehub\Telnet\Components\Command;
@@ -61,6 +62,7 @@ class TelnetParserTest extends TestCase
         $events = (new TelnetParser())->push($raw);
 
         $this->assertCount(1, $events);
+        $this->assertInstanceOf(DataEvent::class, $events[0]);
         $this->assertSame("a\xFFb", $events[0]->data);
     }
 
@@ -99,6 +101,7 @@ class TelnetParserTest extends TestCase
         // IAC split from its command; command split from its option.
         $first = $parser->push('hi' . chr(Command::IAC));
         $this->assertCount(1, $first);
+        $this->assertInstanceOf(DataEvent::class, $first[0]);
         $this->assertSame('hi', $first[0]->data);
         $this->assertFalse($parser->isIdle());
 

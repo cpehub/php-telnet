@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Integration;
 
 use Cpehub\Telnet\Transport\StreamTransport;

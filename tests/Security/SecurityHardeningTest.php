@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Security;
 
 use Cpehub\Telnet\Client;
@@ -6,12 +7,11 @@ use Cpehub\Telnet\Components\CommandSequence;
 use Cpehub\Telnet\Components\Printer;
 use Cpehub\Telnet\Exceptions\ConnectionException;
 use Cpehub\Telnet\Exceptions\TelnetException;
+use Cpehub\Telnet\Tests\Support\SpyLogger;
 use Cpehub\Telnet\Transport\InMemoryTransport;
 use Cpehub\Telnet\Transport\SocketTransport;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\AbstractLogger;
-use Stringable;
 
 class SecurityHardeningTest extends TestCase
 {
@@ -85,15 +85,8 @@ class SecurityHardeningTest extends TestCase
         new SocketTransport('host', 70000);
     }
 
-    private function spyLogger(): AbstractLogger
+    private function spyLogger(): SpyLogger
     {
-        return new class extends AbstractLogger {
-            /** @var list<string> */
-            public array $lines = [];
-            public function log($level, string|Stringable $message, array $context = []): void
-            {
-                $this->lines[] = (string) $message;
-            }
-        };
+        return new SpyLogger();
     }
 }
