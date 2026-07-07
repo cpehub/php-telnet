@@ -88,6 +88,38 @@ class CommandSequenceTest extends TestCase
     }
 
     #[Test]
+    public function compileDoublesIacInTextData(): void
+    {
+        $sequence = (new CommandSequence())->addText("a\xFFb");
+
+        $this->assertSame("a\xFF\xFFb", $sequence->compile());
+    }
+
+    #[Test]
+    public function compileDoublesIacInSubnegotiationParams(): void
+    {
+        $sequence = (new CommandSequence())->addOption(Option::TERMINAL_TYPE, "x\xFFy");
+
+        $expected = chr(Command::IAC) . chr(Command::SB) . chr(Option::TERMINAL_TYPE)
+            . "x\xFF\xFFy"
+            . chr(Command::IAC) . chr(Command::SE);
+
+        $this->assertSame($expected, $sequence->compile());
+    }
+
+    #[Test]
+    public function parseThenCompileRoundTripsDataContainingIac(): void
+    {
+        // Wire form of the text "a<0xFF>b": the 0xFF is doubled on the wire.
+        $wire = "a\xFF\xFFb";
+
+        $sequence = new CommandSequence($wire);
+
+        $this->assertSame("a\xFFb", $sequence->getText());
+        $this->assertSame($wire, $sequence->compile());
+    }
+
+    #[Test]
     public function builderCompilesNegotiationAndText(): void
     {
         $sequence = (new CommandSequence())

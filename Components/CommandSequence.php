@@ -3,6 +3,7 @@ namespace Cpehub\Telnet\Components;
 
 use Cpehub\Telnet\Components\Command;
 use Cpehub\Telnet\Exceptions\ProtocolException;
+use Cpehub\Telnet\Protocol\IacCodec;
 
 class CommandSequence
 {
@@ -18,12 +19,18 @@ class CommandSequence
         for ($i = 0; $i < $length; $i++) {
             //if command
             if ($input[$i] == chr(Command::IAC)) {
+                if ($i + 1 >= $length) {
+                    throw new ProtocolException('Truncated telnet command: dangling IAC at end of input.');
+                }
+                // IAC IAC is a literal 0xFF data byte, not the start of a command.
+                if ($input[$i + 1] === chr(Command::IAC)) {
+                    $text .= chr(Command::IAC);
+                    $i++;
+                    continue;
+                }
                 if ($text !== '') {
                     $this->addText($text); //flush current text
                     $text = '';
-                }
-                if ($i + 1 >= $length) {
-                    throw new ProtocolException('Truncated telnet command: dangling IAC at end of input.');
                 }
                 $i++;
 
@@ -38,6 +45,16 @@ class CommandSequence
                             throw new ProtocolException('Unterminated subnegotiation: missing IAC SE.');
                         }
                         if ($input[++$i] === chr(Command::IAC)) {
+                            if ($i + 1 >= $length) {
+                                throw new ProtocolException('Unterminated subnegotiation: dangling IAC.');
+                            }
+                            // IAC IAC inside SB params is a literal 0xFF data byte.
+                            if ($input[$i + 1] === chr(Command::IAC)) {
+                                $data .= chr(Command::IAC);
+                                $i++;
+                                continue;
+                            }
+                            // IAC SE terminates the subnegotiation.
                             break;
                         }
                         $data .= $input[$i];
@@ -149,14 +166,34 @@ class CommandSequence
     {
         $compiledSequence = '';
         foreach ($this->sequence as $sequence) {
-            foreach ($sequence as $command) {
+            $isSubnegotiation = $this->isSubnegotiationRow($sequence);
+            foreach ($sequence as $index => $command) {
                 if (is_numeric($command)) {
                     $compiledSequence .= chr($command);
+                    continue;
+                }
+                // String members carry application data and must have their IAC
+                // bytes doubled (RFC 854 for text, RFC 855 for subnegotiation params).
+                if ($isSubnegotiation) {
+                    $compiledSequence .= IacCodec::escapeSubParams($command);
                 } else {
-                    $compiledSequence .= $command;
+                    $compiledSequence .= IacCodec::escape($command);
                 }
             }
         }
         return $compiledSequence;
+    }
+
+    /**
+     * A subnegotiation row is the six-element structure produced by {@see addOption()}:
+     * [IAC, SB, option, data, IAC, SE].
+     */
+    private function isSubnegotiationRow(array $row) : bool
+    {
+        return count($row) === 6
+            && ($row[0] ?? null) === Command::IAC
+            && ($row[1] ?? null) === Command::SB
+            && ($row[4] ?? null) === Command::IAC
+            && ($row[5] ?? null) === Command::SE;
     }
 }
