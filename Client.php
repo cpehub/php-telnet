@@ -8,59 +8,80 @@ use Cpehub\Telnet\Components\Command;
 use Cpehub\Telnet\Components\Option;
 use Cpehub\Telnet\Components\Printer;
 use Cpehub\Telnet\Exceptions\TelnetException;
+use Cpehub\Telnet\Protocol\OptionNegotiator;
+use Cpehub\Telnet\Protocol\NegotiationPolicy;
+use Cpehub\Telnet\Protocol\TelnetParser;
+use Cpehub\Telnet\Protocol\Event\CommandEvent;
+use Cpehub\Telnet\Protocol\Event\DataEvent;
+use Cpehub\Telnet\Protocol\Event\NegotiationEvent;
+use Cpehub\Telnet\Protocol\Event\SubnegotiationEvent;
+use Cpehub\Telnet\Transport\TransportInterface;
+use Cpehub\Telnet\Transport\SocketTransport;
 
+/**
+ * Telnet client.
+ *
+ * The client owns a {@see TransportInterface} for byte I/O, a {@see TelnetParser}
+ * that demultiplexes the incoming stream into data and protocol events, and an
+ * {@see OptionNegotiator} that answers the server's option negotiation while the
+ * caller waits for output. Application data is accumulated in a clean buffer that
+ * prompt/sequence matching runs against, so telnet control bytes never leak into
+ * matched text.
+ *
+ * NOTE (behaviour change vs 1.0.x): $timelimit is now expressed in **milliseconds**
+ * everywhere (constructor and per-call overrides). The previous code mixed
+ * seconds/milliseconds/microseconds inconsistently. The constructor default of
+ * 1000 ms preserves the old "1 second" behaviour.
+ */
 class Client
 {
-    const BYTE_READ = 4096;  //4kb
-    const READ_TIMEOUT = 10000; //10ms
+    const BYTE_READ = 4096; // 4kb read chunk
 
-    private $socket;
-    private $buffer = '';
+    private TransportInterface $transport;
+    private TelnetParser $parser;
+    private OptionNegotiator $negotiator;
 
-    /** @var int $timelimit */
-    private $timelimit;
-    /** @var LoggerInterface $logger */
-    private $logger;
-    /** @var string $promptPattern */
-    private $promptPattern;
+    /** Clean application data accumulated from the stream (telnet commands stripped). */
+    private string $buffer = '';
 
+    /** @var int Default await time limit, in milliseconds. */
+    private int $timelimit;
+    /** @var LoggerInterface|null */
+    private ?LoggerInterface $logger;
+    /** @var string|null */
+    private ?string $promptPattern = null;
+
+    /**
+     * @param string $ip Telnet host (ip or hostname), or a preconfigured transport is passed separately.
+     * @param int $port Telnet host port.
+     * @param int $timelimit Default await time limit, in milliseconds.
+     * @param LoggerInterface|null $logger Optional PSR-3 logger.
+     * @param TransportInterface|null $transport Override the transport (e.g. TLS); defaults to a plain socket.
+     * @param NegotiationPolicy|null $policy Override which options the client agrees to negotiate.
+     */
     public function __construct(
         string $ip,
         int $port = 23,
-        int $timelimit = 1, // 1 Second
-        ?LoggerInterface $logger = null
+        int $timelimit = 1000, // milliseconds
+        ?LoggerInterface $logger = null,
+        ?TransportInterface $transport = null,
+        ?NegotiationPolicy $policy = null
     ) {
         $this->logger = $logger;
-        $this->timelimit = $timelimit * 1000; //TODO: Use milliseconds for more precision.
+        $this->timelimit = $timelimit;
+        $this->transport = $transport ?? new SocketTransport($ip, $port);
+        $this->parser = new TelnetParser();
+        $this->negotiator = new OptionNegotiator($policy ?? new NegotiationPolicy(), $logger);
 
-        $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-        if ($socket === false) {
-            throw new TelnetException(
-                'Unable to create socket: ' . socket_strerror(socket_last_error())
-            );
-        }
-        $this->socket = $socket;
-        socket_set_block($this->socket);
-        if (socket_connect($this->socket, $ip, $port) === false) {
-            $error = socket_strerror(socket_last_error($this->socket));
-            socket_close($this->socket);
-            throw new TelnetException(
-                sprintf('Unable to connect to %s:%d: %s', $ip, $port, $error)
-            );
-        }
+        $this->transport->connect();
     }
 
     public function __destruct()
     {
-        try{
-            if(is_resource($this->socket) && $this->socket instanceof \Socket){
-                socket_close($this->socket);
-            }
-        }catch(\Throwable $e){
-            if(is_null($this->logger)){
-                return;
-            }
-            $this->logger->warning("Socket was closed before the class got destructed");
+        try {
+            $this->transport->close();
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Transport was already closed before destruction: ' . $e->getMessage());
         }
     }
 
@@ -76,166 +97,238 @@ class Client
         return $this;
     }
 
+    /**
+     * Perform the login procedure.
+     *
+     * Unlike 1.0.x this no longer scripts a fixed burst of WILL/DO and does not
+     * wait for a hard-coded reply; option negotiation is handled automatically by
+     * the read loop. We proactively offer the RFC 1123 §3 baseline (SUPPRESS-GO-AHEAD),
+     * then drive the login/password prompts.
+     */
     public function login(string $login, string $password, ?string $promptPattern = null): CommandSequence
     {
-        //set telnet connection options
+        // Offer/request the mandatory baseline; the negotiator suppresses duplicates
+        // and the read loop answers whatever the server negotiates in return.
         $sequence = new CommandSequence();
-        $sequence
-            ->addCommand(Command::DO , Option::SUPPRESS_GO_AHEAD)
-            ->addCommand(Command::WILL, Option::TERMINAL_TYPE)
-            ->addCommand(Command::WILL, Option::WINDOW_SIZE)
-            ->addCommand(Command::WILL, Option::TERMINAL_SPEED)
-            ->addCommand(Command::WILL, Option::REMOTE_FLOW_CONTROL)
-            ->addCommand(Command::WILL, Option::TERMINAL_LINEMODE)
-            ->addCommand(Command::WILL, Option::ENVIRONMENT)
-            ->addCommand(Command::DO , Option::STATUS)
-            ->addCommand(Command::WILL, Option::X_DISPLAY_LOCATION);
-        $this->sendSequence($sequence);
+        foreach ([
+            $this->negotiator->askEnableUs(Option::SUPPRESS_GO_AHEAD),
+            $this->negotiator->askEnableHim(Option::SUPPRESS_GO_AHEAD),
+        ] as $reply) {
+            if ($reply !== null) {
+                $sequence->addCommand($reply, Option::SUPPRESS_GO_AHEAD);
+            }
+        }
+        if ($sequence->getSequence() !== []) {
+            $this->sendSequence($sequence);
+        }
 
-        //get telnet response
-        $sequence = new CommandSequence();
-        $sequence->addCommand(Command::DONT, Option::X_DISPLAY_LOCATION);
-        $this->awaitSequence($sequence);
+        // Wait for the login prompt, then send the username. Match the common
+        // "login:" / "Username:" variants at the end of the received data.
+        $this->awaitPrompt('~(?:login|user(?:name)?)[: ]*$~i', $this->timelimit);
+        $this->sendSequence((new CommandSequence())->addText($login, chr(Printer::CR)));
 
-        //enable authorization
-        $sequence = new CommandSequence();
-        $sequence
-            ->addCommand(Command::DO , Option::SUPPRESS_GO_AHEAD)
-            ->addCommand(Command::WILL, Option::ECHO );
-        $this->sendSequence($sequence);
+        // Wait for the password prompt, then send the password (never logged).
+        $this->awaitPrompt('~password[: ]*$~i', $this->timelimit);
+        $this->sendSequence(
+            (new CommandSequence())->addText($password, chr(Printer::CR)),
+            sensitive: true
+        );
 
-        //set login
-        $sequence = new CommandSequence();
-        $sequence->addText($login, Printer::CR);
-        $this->sendSequence($sequence);
-
-        $sequence = new CommandSequence();
-        $sequence->addText('Password:');
-        $this->awaitSequence($sequence);
-
-        //set password
-        $sequence = new CommandSequence();
-        $sequence->addText($password, Printer::CR);
-        $this->sendSequence($sequence);
         return $this->awaitPrompt($promptPattern ?? $this->promptPattern);
     }
 
+    /**
+     * Send a command line and return the text received up to the prompt.
+     */
     public function sendMessage(string $message, ?string $promptPattern = null, ?int $timelimit = null): string
     {
-        if (empty($timelimit)) {
-            $timelimit = $this->timelimit;
-        } else {
-            $timelimit *= 1000;
-        }
-        if (empty($promptPattern)) {
-            $promptPattern = $this->promptPattern;
-        }
-        $sequence = new CommandSequence();
-        $sequence->addText($message, Printer::CR);
-        $this->sendSequence($sequence);
+        $timelimit ??= $this->timelimit;
+        $promptPattern ??= $this->promptPattern;
+
+        $this->sendSequence((new CommandSequence())->addText($message, chr(Printer::CR)));
         $result = $this->awaitPrompt($promptPattern, $timelimit);
+
         return $result->getText();
     }
 
+    /**
+     * Send a command line without awaiting any response.
+     */
     public function sendLastMessage(string $message): void
     {
-        $sequence = new CommandSequence();
-        $sequence->addText($message, Printer::CR);
-        $this->sendSequence($sequence);
+        $this->sendSequence((new CommandSequence())->addText($message, chr(Printer::CR)));
     }
 
-    public function sendSequence(CommandSequence $sequence)
+    /**
+     * Write a command sequence to the transport.
+     *
+     * @param bool $sensitive When true, the payload is redacted in logs (used for credentials).
+     */
+    public function sendSequence(CommandSequence $sequence, bool $sensitive = false): void
     {
-        if (!empty($this->logger)) {
-            $this->logger->info('send: ' . $sequence->dump());
-        }
-        socket_write($this->socket, $sequence->compile());
+        $this->logger?->info('send: ' . ($sensitive ? '<redacted>' : $sequence->dump()));
+        $this->transport->write($sequence->compile());
     }
 
+    /**
+     * Wait until the given raw sequence appears in the incoming data, then return
+     * a CommandSequence built from everything up to and including it.
+     *
+     * @param int|null $timelimit Time limit in milliseconds.
+     */
     public function awaitSequence(CommandSequence $sequence, ?int $timelimit = null): CommandSequence
     {
-        if (empty($timelimit)) {
-            $timelimit = $this->timelimit;
-        } else {
-            $timelimit *= 1000;
+        $timelimit ??= $this->timelimit;
+        $needle = $sequence->getText();
+
+        $position = $this->readUntil(
+            fn (string $buffer): int|false => $needle === '' ? 0 : strpos($buffer, $needle),
+            $timelimit
+        );
+
+        if ($position === null) {
+            $this->logger?->error('expected sequence: ' . $sequence->dump());
+            throw new TelnetException('Telnet sequence await timeout exceeded.');
         }
-        $needle = $sequence->compile();
-        $ep = 0;
-        $counter = 0;
-        socket_set_nonblock($this->socket);
-        while (
-            ($ep = strpos($this->buffer, $needle, 0)) === false
-            && $counter < ($timelimit / self::READ_TIMEOUT)
-        ) {
-            usleep(self::READ_TIMEOUT);
-            $res = socket_read($this->socket, self::BYTE_READ);
-            if ($res !== false) {
-                $this->buffer .= $res;
+
+        return $this->consume($position + strlen($needle));
+    }
+
+    /**
+     * Wait until the given prompt pattern matches the incoming data, then return
+     * a CommandSequence built from everything up to and including the match.
+     *
+     * @param int|null $timelimit Time limit in milliseconds.
+     */
+    public function awaitPrompt(?string $promptPattern = null, ?int $timelimit = null): CommandSequence
+    {
+        $promptPattern ??= $this->promptPattern;
+        $timelimit ??= $this->timelimit;
+
+        if ($promptPattern === null) {
+            throw new TelnetException('No prompt pattern configured; set one via setPromptPattern() or pass it explicitly.');
+        }
+        if (@preg_match($promptPattern, '') === false) {
+            throw new TelnetException('Invalid prompt pattern: ' . $promptPattern);
+        }
+
+        $end = $this->readUntil(
+            function (string $buffer) use ($promptPattern): int|false {
+                if (preg_match($promptPattern, $buffer, $match, PREG_OFFSET_CAPTURE)) {
+                    return $match[0][1] + strlen($match[0][0]);
+                }
+                return false;
+            },
+            $timelimit
+        );
+
+        if ($end === null) {
+            $this->logger?->error('expected prompt: ' . $promptPattern);
+            throw new TelnetException('Telnet prompt waiting time exceeded.');
+        }
+
+        return $this->consume($end);
+    }
+
+    /**
+     * Drive the read loop until $matcher returns a non-false offset into the clean
+     * data buffer or the deadline passes. Incoming negotiation is answered inline.
+     *
+     * @param callable(string): (int|false) $matcher Returns the end offset of the match, or false.
+     * @return int|null The end offset, or null on timeout.
+     */
+    private function readUntil(callable $matcher, int $timelimitMs): ?int
+    {
+        // Check anything already buffered before waiting on the socket.
+        $offset = $matcher($this->buffer);
+        if ($offset !== false) {
+            return $offset;
+        }
+
+        $deadline = $this->now() + $timelimitMs;
+        do {
+            $remaining = $deadline - $this->now();
+            if ($remaining <= 0) {
+                break;
             }
-            $counter++;
-        }
-        socket_set_block($this->socket);
-        if ($counter >= $timelimit / self::READ_TIMEOUT) {
-            if (!empty($this->logger)) {
-                $this->logger->error(
-                    'expected: ' . $sequence->dump()
-                    . 'received: ' . $this->buffer
-                );
+
+            if (!$this->transport->waitReadable($remaining)) {
+                continue;
             }
-            throw new TelnetException('Telnet sequence await timeout exceeded. response: ' . $this->buffer);
+
+            $chunk = $this->transport->read(self::BYTE_READ);
+            if ($chunk === '') {
+                continue;
+            }
+
+            $this->ingest($chunk);
+
+            $offset = $matcher($this->buffer);
+            if ($offset !== false) {
+                return $offset;
+            }
+        } while ($this->now() < $deadline);
+
+        return null;
+    }
+
+    /**
+     * Feed raw bytes through the parser: append data to the clean buffer, answer
+     * negotiation, and drop pure protocol events.
+     */
+    private function ingest(string $chunk): void
+    {
+        foreach ($this->parser->push($chunk) as $event) {
+            if ($event instanceof DataEvent) {
+                $this->buffer .= $event->data;
+            } elseif ($event instanceof NegotiationEvent) {
+                $this->handleNegotiation($event);
+            } elseif ($event instanceof SubnegotiationEvent) {
+                $this->logger?->debug(sprintf('subnegotiation option 0x%02X ignored', $event->option));
+            } elseif ($event instanceof CommandEvent) {
+                $this->logger?->debug(sprintf('telnet command 0x%02X received', $event->command));
+            }
         }
-        $ep += strlen($needle);
-        $raw = substr($this->buffer, 0, $ep);
-        $this->buffer = substr($this->buffer, $ep);
-        $sequence = new CommandSequence($raw);
-        if (!empty($this->logger)) {
-            $this->logger->info('received: ' . $sequence->dump() . ' time: ' . $counter * self::READ_TIMEOUT / 1000 . 'ms');
+    }
+
+    private function handleNegotiation(NegotiationEvent $event): void
+    {
+        $reply = match ($event->command) {
+            Command::WILL => $this->negotiator->receiveWill($event->option),
+            Command::WONT => $this->negotiator->receiveWont($event->option),
+            Command::DO   => $this->negotiator->receiveDo($event->option),
+            Command::DONT => $this->negotiator->receiveDont($event->option),
+            default       => null,
+        };
+
+        if ($reply !== null) {
+            $this->sendSequence((new CommandSequence())->addCommand($reply, $event->option));
         }
+    }
+
+    /**
+     * Slice the first $length bytes off the clean buffer and return them as a
+     * CommandSequence (plain text — protocol bytes were already stripped).
+     */
+    private function consume(int $length): CommandSequence
+    {
+        $raw = substr($this->buffer, 0, $length);
+        $this->buffer = substr($this->buffer, $length);
+
+        $sequence = new CommandSequence();
+        if ($raw !== '') {
+            $sequence->addText($raw);
+        }
+        $this->logger?->info('received: ' . strlen($raw) . ' bytes');
+
         return $sequence;
     }
 
-    public function awaitPrompt(?string $promptPattern = null, ?int $timelimit = null): CommandSequence
+    /**
+     * Current monotonic time in milliseconds.
+     */
+    private function now(): int
     {
-        if (empty($promptPattern)) {
-            $promptPattern = $this->promptPattern;
-        }
-        if (empty($timelimit)) {
-            $timelimit = $this->timelimit;
-        } else {
-            $timelimit *= 1000;
-        }
-        $counter = 0;
-        $match = [];
-        socket_set_nonblock($this->socket);
-        while (
-            !preg_match($promptPattern, $this->buffer, $match, PREG_OFFSET_CAPTURE)
-            && $counter < ($timelimit / self::READ_TIMEOUT)
-        ) {
-            usleep(self::READ_TIMEOUT);
-            $res = socket_read($this->socket, self::BYTE_READ);
-            if ($res !== false && $res !== '') {
-                $this->buffer .= $res;
-            }
-            $counter++;
-        }
-        socket_set_block($this->socket);
-        if ($counter >= $timelimit / self::READ_TIMEOUT) {
-            if (!empty($this->logger)) {
-                $this->logger->error(
-                    'expected: ' . $promptPattern
-                    . 'received: ' . $this->buffer
-                );
-            }
-            throw new TelnetException('Telnet prompt waiting time exceeded, response: ' . $this->buffer);
-        }
-        $ep = $match[0][1];
-        $ep += strlen($match[0][0]);
-        $raw = substr($this->buffer, 0, $ep);
-        $this->buffer = substr($this->buffer, $ep);
-        $sequence = new CommandSequence($raw);
-        if (!empty($this->logger)) {
-            $this->logger->info('received: ' . $sequence->dump() . ' time: ' . $counter * self::READ_TIMEOUT / 1000 . 'ms');
-        }
-        return $sequence;
+        return (int) (hrtime(true) / 1_000_000);
     }
 }
