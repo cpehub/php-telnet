@@ -88,6 +88,14 @@ Tooling / tests
 - Added GitHub Actions CI: phpunit (matrix PHP 8.2/8.3/8.4), phpstan, and phpcs
   workflows, each running on push to develop/master and on pull requests.
 
+Documentation
+- Rewrote the README for the v2 API (correct method names, milliseconds
+  timelimit, real constructor signature, TLS, typed exceptions) and fixed the
+  stale/buggy examples it carried since v1.
+- Added an "Upgrading from v1 to v2" section documenting every behavioural
+  change (timelimit unit, IAC doubling, login() rewrite, awaitPrompt validation,
+  new composer requirements, ABORT_OUTPUT rename) with before/after guidance.
+
 
 v1.0.2 and earlier
 ------------------
