@@ -27,6 +27,14 @@ Tooling/tests
 - Removed the "version" field from composer.json; Packagist derives the version
   from git tags. Clears the "composer validate" warning.
 - Added PHP 8.5 to the PHPUnit CI matrix (now 8.2, 8.3, 8.4, 8.5).
+- Added PHP Mess Detector (PHPMD) as a fourth quality gate covering the
+  design/complexity axis (codesize + design rulesets in phpmd.xml). Naming and
+  unused-code checks are intentionally left to PHPStan, and the opinionated
+  cleancode/controversial rulesets are excluded to keep noise low. Wired up as a
+  "composer phpmd" script, included in "composer check", and run by a dedicated
+  phpmd CI workflow. Inherent protocol complexity (IAC parsing, the RFC 1143
+  state machine, the client facade) is documented with annotated
+  @SuppressWarnings rather than by lowering thresholds.
 
 
 v2.0.0 (2026-07-07)

@@ -1,7 +1,7 @@
 # php-telnet
 A standards-compliant Telnet client for PHP.
 
-[![phpcs](https://github.com/cpehub/php-telnet/actions/workflows/phpcs.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpcs.yml) [![phpstan](https://github.com/cpehub/php-telnet/actions/workflows/phpstan.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpstan.yml) [![phpunit](https://github.com/cpehub/php-telnet/actions/workflows/phpunit.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpunit.yml)
+[![phpcs](https://github.com/cpehub/php-telnet/actions/workflows/phpcs.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpcs.yml) [![phpstan](https://github.com/cpehub/php-telnet/actions/workflows/phpstan.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpstan.yml) [![phpmd](https://github.com/cpehub/php-telnet/actions/workflows/phpmd.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpmd.yml) [![phpunit](https://github.com/cpehub/php-telnet/actions/workflows/phpunit.yml/badge.svg)](https://github.com/cpehub/php-telnet/actions/workflows/phpunit.yml)
 
 php-telnet speaks the Telnet protocol correctly: it escapes `IAC` per RFC 854/855,
 negotiates options with the RFC 1143 "Q Method" state machine, and answers the
