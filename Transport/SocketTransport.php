@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Transport;
 
 use Cpehub\Telnet\Exceptions\ConnectionException;
@@ -74,13 +75,19 @@ final class SocketTransport implements TransportInterface
 
     public function read(int $length): string
     {
+        if ($length < 1) {
+            return '';
+        }
+
         $socket = $this->requireSocket();
 
         $data = @socket_read($socket, $length, PHP_BINARY_READ);
         if ($data === false) {
             $code = socket_last_error($socket);
             // EAGAIN/EWOULDBLOCK: nothing to read right now, not a hard error.
-            if ($code === SOCKET_EAGAIN || $code === SOCKET_EWOULDBLOCK) {
+            // (On Linux both constants are 11; on some platforms they differ.)
+            $wouldBlock = array_unique([SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]);
+            if (in_array($code, $wouldBlock, true)) {
                 socket_clear_error($socket);
                 return '';
             }

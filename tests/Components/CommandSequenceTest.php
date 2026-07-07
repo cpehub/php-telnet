@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Components;
 
 use Cpehub\Telnet\Components\Command;

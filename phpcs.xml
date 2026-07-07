@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<ruleset name="php-telnet">
+    <description>PSR-12 coding standard for cpehub/php-telnet.</description>
+
+    <file>Client.php</file>
+    <file>Components</file>
+    <file>Protocol</file>
+    <file>Transport</file>
+    <file>Exceptions</file>
+    <file>tests</file>
+
+    <exclude-pattern>vendor/*</exclude-pattern>
+    <exclude-pattern>RFC/*</exclude-pattern>
+
+    <arg name="colors"/>
+    <arg value="p"/>
+
+    <rule ref="PSR12"/>
+</ruleset>

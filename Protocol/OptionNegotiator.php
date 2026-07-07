@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Protocol;
 
 use Cpehub\Telnet\Components\Command;
@@ -77,8 +78,6 @@ final class OptionNegotiator
                 $this->store($option, $o);
                 return Command::DONT;
         }
-
-        return null;
     }
 
     /**
@@ -116,8 +115,6 @@ final class OptionNegotiator
                 $this->store($option, $o);
                 return null;
         }
-
-        return null;
     }
 
     /**
@@ -164,8 +161,6 @@ final class OptionNegotiator
                 $this->store($option, $o);
                 return Command::WONT;
         }
-
-        return null;
     }
 
     /**
@@ -203,8 +198,6 @@ final class OptionNegotiator
                 $this->store($option, $o);
                 return null;
         }
-
-        return null;
     }
 
     /**
@@ -239,8 +232,6 @@ final class OptionNegotiator
                 $this->error('Already negotiating for enable (him)', $option);
                 return null;
         }
-
-        return null;
     }
 
     /**
@@ -275,8 +266,6 @@ final class OptionNegotiator
                 }
                 return null;
         }
-
-        return null;
     }
 
     /**
@@ -311,8 +300,6 @@ final class OptionNegotiator
                 $this->error('Already negotiating for enable (us)', $option);
                 return null;
         }
-
-        return null;
     }
 
     /**
@@ -347,8 +334,6 @@ final class OptionNegotiator
                 }
                 return null;
         }
-
-        return null;
     }
 
     /** Whether the server-side of an option is currently enabled. */

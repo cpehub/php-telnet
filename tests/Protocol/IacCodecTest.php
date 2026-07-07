@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Protocol;
 
 use Cpehub\Telnet\Protocol\IacCodec;

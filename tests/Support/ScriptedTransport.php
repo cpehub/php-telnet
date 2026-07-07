@@ -1,4 +1,5 @@
 <?php
+
 namespace Cpehub\Telnet\Tests\Support;
 
 use Cpehub\Telnet\Transport\TransportInterface;

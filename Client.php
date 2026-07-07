@@ -35,10 +35,10 @@ use Cpehub\Telnet\Transport\SocketTransport;
  */
 class Client
 {
-    const BYTE_READ = 4096; // 4kb read chunk
+    public const BYTE_READ = 4096; // 4kb read chunk
 
     /** Default cap on the clean data buffer (bytes) to bound memory against a chatty/hostile peer. */
-    const DEFAULT_MAX_BUFFER = 16 * 1024 * 1024; // 16 MiB
+    public const DEFAULT_MAX_BUFFER = 16 * 1024 * 1024; // 16 MiB
 
     private TransportInterface $transport;
     private TelnetParser $parser;
@@ -118,10 +118,12 @@ class Client
         // Offer/request the mandatory baseline; the negotiator suppresses duplicates
         // and the read loop answers whatever the server negotiates in return.
         $sequence = new CommandSequence();
-        foreach ([
+        foreach (
+            [
             $this->negotiator->askEnableUs(Option::SUPPRESS_GO_AHEAD),
             $this->negotiator->askEnableHim(Option::SUPPRESS_GO_AHEAD),
-        ] as $reply) {
+            ] as $reply
+        ) {
             if ($reply !== null) {
                 $sequence->addCommand($reply, Option::SUPPRESS_GO_AHEAD);
             }
@@ -214,7 +216,9 @@ class Client
         $timelimit ??= $this->timelimit;
 
         if ($promptPattern === null) {
-            throw new TelnetException('No prompt pattern configured; set one via setPromptPattern() or pass it explicitly.');
+            throw new TelnetException(
+                'No prompt pattern configured; set one via setPromptPattern() or pass it explicitly.'
+            );
         }
         if (@preg_match($promptPattern, '') === false) {
             throw new TelnetException('Invalid prompt pattern: ' . $promptPattern);

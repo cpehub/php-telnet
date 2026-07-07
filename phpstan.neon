@@ -1,0 +1,12 @@
+parameters:
+    level: 8
+    paths:
+        - Client.php
+        - Components
+        - Protocol
+        - Transport
+        - Exceptions
+        - tests
+    excludePaths:
+        - vendor
+        - RFC
