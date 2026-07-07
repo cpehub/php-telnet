@@ -37,6 +37,9 @@ class Client
 {
     const BYTE_READ = 4096; // 4kb read chunk
 
+    /** Default cap on the clean data buffer (bytes) to bound memory against a chatty/hostile peer. */
+    const DEFAULT_MAX_BUFFER = 16 * 1024 * 1024; // 16 MiB
+
     private TransportInterface $transport;
     private TelnetParser $parser;
     private OptionNegotiator $negotiator;
@@ -50,6 +53,8 @@ class Client
     private ?LoggerInterface $logger;
     /** @var string|null */
     private ?string $promptPattern = null;
+    /** @var int Maximum size of the clean data buffer, in bytes. */
+    private int $maxBuffer;
 
     /**
      * @param string $ip Telnet host (ip or hostname), or a preconfigured transport is passed separately.
@@ -58,6 +63,7 @@ class Client
      * @param LoggerInterface|null $logger Optional PSR-3 logger.
      * @param TransportInterface|null $transport Override the transport (e.g. TLS); defaults to a plain socket.
      * @param NegotiationPolicy|null $policy Override which options the client agrees to negotiate.
+     * @param int $maxBuffer Cap on accumulated unmatched data, in bytes (guards against a hostile peer).
      */
     public function __construct(
         string $ip,
@@ -65,10 +71,12 @@ class Client
         int $timelimit = 1000, // milliseconds
         ?LoggerInterface $logger = null,
         ?TransportInterface $transport = null,
-        ?NegotiationPolicy $policy = null
+        ?NegotiationPolicy $policy = null,
+        int $maxBuffer = self::DEFAULT_MAX_BUFFER
     ) {
         $this->logger = $logger;
         $this->timelimit = $timelimit;
+        $this->maxBuffer = $maxBuffer;
         $this->transport = $transport ?? new SocketTransport($ip, $port);
         $this->parser = new TelnetParser();
         $this->negotiator = new OptionNegotiator($policy ?? new NegotiationPolicy(), $logger);
@@ -281,6 +289,12 @@ class Client
         foreach ($this->parser->push($chunk) as $event) {
             if ($event instanceof DataEvent) {
                 $this->buffer .= $event->data;
+                if (strlen($this->buffer) > $this->maxBuffer) {
+                    throw new TelnetException(sprintf(
+                        'Telnet response exceeded the maximum buffer size of %d bytes without matching.',
+                        $this->maxBuffer
+                    ));
+                }
             } elseif ($event instanceof NegotiationEvent) {
                 $this->handleNegotiation($event);
             } elseif ($event instanceof SubnegotiationEvent) {
