@@ -3,12 +3,16 @@ namespace Cpehub\Telnet\Components;
 
 class Option
 {
+    /** Binary Transmission (RFC 856). */
+    const TRANSMIT_BINARY     = 0x00;
     /** Echo (RFC 857). */
     const ECHO                = 0x01;
     /** Suppress Go Ahead (RFC 858). */
     const SUPPRESS_GO_AHEAD   = 0x03;
     /** Status (RFC 859). */
     const STATUS              = 0x05;
+    /** End of Record (RFC 885). */
+    const END_OF_RECORD       = 0x19;
     /** Terminal Type (RFC 1091). */
     const TERMINAL_TYPE       = 0x18;
     /** Negotiate About Window Size / NAWS (RFC 1073). */
