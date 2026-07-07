@@ -119,15 +119,46 @@ class Client
     }
 
     /**
+     * Default login/username prompt pattern used when none is supplied.
+     * Matches the common "login:" / "Username:" variants at the end of the buffer.
+     */
+    public const DEFAULT_LOGIN_PROMPT = '~(?:login|user(?:name)?)[: ]*$~i';
+
+    /**
+     * Default password prompt pattern used when none is supplied.
+     */
+    public const DEFAULT_PASSWORD_PROMPT = '~password[: ]*$~i';
+
+    /**
      * Perform the login procedure.
      *
      * Unlike 1.0.x this no longer scripts a fixed burst of WILL/DO and does not
      * wait for a hard-coded reply; option negotiation is handled automatically by
      * the read loop. We proactively offer the RFC 1123 §3 baseline (SUPPRESS-GO-AHEAD),
      * then drive the login/password prompts.
+     *
+     * The login and password prompt patterns are overridable so callers can match
+     * vendor-specific prompts that the defaults do not cover — e.g. Huawei OLTs
+     * present ">>User name:" (a space between "User" and "name"), which the default
+     * "user(?:name)?" pattern does not match. Pass $loginPattern / $passwordPattern
+     * to drive those. Both default to the class constants when null.
+     *
+     * @param string      $login           the username to send
+     * @param string      $password        the password to send (never logged)
+     * @param string|null $promptPattern   shell prompt to await after login (defaults to the configured pattern)
+     * @param string|null $loginPattern    username-prompt pattern to await (defaults to self::DEFAULT_LOGIN_PROMPT)
+     * @param string|null $passwordPattern password-prompt pattern to await (defaults to self::DEFAULT_PASSWORD_PROMPT)
      */
-    public function login(string $login, string $password, ?string $promptPattern = null): CommandSequence
-    {
+    public function login(
+        string $login,
+        string $password,
+        ?string $promptPattern = null,
+        ?string $loginPattern = null,
+        ?string $passwordPattern = null
+    ): CommandSequence {
+        $loginPattern ??= self::DEFAULT_LOGIN_PROMPT;
+        $passwordPattern ??= self::DEFAULT_PASSWORD_PROMPT;
+
         // Offer/request the mandatory baseline; the negotiator suppresses duplicates
         // and the read loop answers whatever the server negotiates in return.
         $sequence = new CommandSequence();
@@ -145,13 +176,12 @@ class Client
             $this->sendSequence($sequence);
         }
 
-        // Wait for the login prompt, then send the username. Match the common
-        // "login:" / "Username:" variants at the end of the received data.
-        $this->awaitPrompt('~(?:login|user(?:name)?)[: ]*$~i', $this->timelimit);
+        // Wait for the login prompt, then send the username.
+        $this->awaitPrompt($loginPattern, $this->timelimit);
         $this->sendSequence((new CommandSequence())->addText($login, chr(Printer::CR)));
 
         // Wait for the password prompt, then send the password (never logged).
-        $this->awaitPrompt('~password[: ]*$~i', $this->timelimit);
+        $this->awaitPrompt($passwordPattern, $this->timelimit);
         $this->sendSequence(
             (new CommandSequence())->addText($password, chr(Printer::CR)),
             sensitive: true

@@ -6,6 +6,21 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
+v2.2.0 (2026-07-07)
+-------------------
+
+Features
+- Client::login() now accepts optional $loginPattern and $passwordPattern
+  arguments so callers can match vendor-specific prompts that the built-in
+  defaults do not cover. The motivating case is Huawei OLTs, which present
+  ">>User name:" (a space between "User" and "name") — the default
+  "user(?:name)?" pattern never matches it, so login would time out. The two
+  new parameters are appended after $promptPattern and both default to null,
+  so existing callers are unaffected. The former inline defaults are now
+  exposed as the public constants Client::DEFAULT_LOGIN_PROMPT and
+  Client::DEFAULT_PASSWORD_PROMPT.
+
+
 v2.1.0 (2026-07-07)
 -------------------
 
