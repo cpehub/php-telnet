@@ -6,7 +6,7 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
-v2.0.0 (unreleased)
+v2.0.0 (2026-07-07)
 -------------------
 First substantial update since v1.0.2, released as a major version because of
 the behavioural contract changes below. The library was previously broken as
@@ -100,4 +100,4 @@ Documentation
 v1.0.2 and earlier
 ------------------
 See the git history and tags (v1.0.2, v1.0.1, v1.0.0). Release notes were not
-maintained in this file before v1.1.0.
+maintained in this file before v2.0.0.
