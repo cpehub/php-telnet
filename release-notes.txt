@@ -1,0 +1,103 @@
+php-telnet — Release Notes
+==========================
+
+This file records the notable changes for each release. The newest version is
+at the top. When cutting a release, its section here is used as the body of the
+GitHub Release (gh release create ... -F release-notes.txt section).
+
+
+v2.0.0 (2026-07-07)
+-------------------
+First substantial update since v1.0.2, released as a major version because of
+the behavioural contract changes below. The library was previously broken as
+published (fatal on autoload) and did not honour the Telnet RFCs. This release
+makes it functional, standards-compliant, faster and hardened. Public method
+signatures are preserved; three behavioural contracts changed (see BREAKING).
+
+BREAKING CHANGES
+- $timelimit is now expressed in integer MILLISECONDS everywhere (constructor
+  and per-call overrides). Previous code mixed seconds/ms/us inconsistently. The
+  constructor default is now 1000 ms, preserving the old "1 second" behaviour.
+- CommandSequence::compile() now doubles IAC (0xFF) bytes in data and in
+  subnegotiation parameters, as required by RFC 854/855. Callers that manually
+  embedded a raw 0xFF and relied on it passing through unchanged are affected.
+- login() no longer emits a fixed WILL/DO burst nor waits for a canned reply.
+  Option negotiation is now handled automatically by the read loop. The method
+  signature and return type are unchanged.
+
+Fixes (critical)
+- Fixed the constructor opening two sockets and leaking the fsockopen handle.
+- Fixed infinite recursion in setLogger() (stack overflow on first call).
+- Fixed a nonsensical read check in the await loop (!empty($res !== false)).
+- Declared psr/log and ext-sockets in composer require (autoload previously
+  fatalled on the missing LoggerInterface).
+- Made the CommandSequence parser bounds-safe: malformed input (dangling IAC,
+  truncated negotiation, unterminated subnegotiation) now throws
+  ProtocolException instead of reading out of bounds.
+
+Standards compliance (RFC)
+- Added IacCodec: RFC 854/855 IAC escape/unescape for data and SB params.
+- Added TelnetParser: a resumable byte-stream parser that demultiplexes the
+  stream into typed events (Data/Negotiation/Subnegotiation/Command) and is
+  safe across chunk boundaries.
+- Implemented the RFC 1143 "Q Method" option-negotiation state machine
+  (OptionNegotiator) with loop prevention; NegotiationPolicy provides the
+  RFC 1123 §3 defaults (enable SUPPRESS-GO-AHEAD and TRANSMIT-BINARY, refuse
+  unsupported options with WONT/DONT, fall back to NVT).
+- Added Option::TRANSMIT_BINARY (0x00) and Option::END_OF_RECORD (0x19).
+
+Performance
+- Replaced the usleep busy-wait polling with socket_select / stream_select.
+- The read loop matches only clean application data (protocol bytes stripped)
+  and no longer rescans control bytes; timeouts use a single monotonic deadline.
+
+Security
+- Credentials are never logged: login() sends the password through a redacted
+  path (send: <redacted>).
+- Exceptions and error logs no longer embed raw buffer contents.
+- Prompt patterns are validated (compilable regex) before the wait loop.
+- Host/port are validated by the transport.
+- The accumulated data buffer is capped (default 16 MiB) to bound memory
+  against a chatty or hostile peer.
+
+Architecture / new capabilities
+- Client is now a thin facade over a TransportInterface, TelnetParser and
+  OptionNegotiator.
+- Added a transport abstraction: SocketTransport (ext-sockets, default) and
+  StreamTransport (streams). StreamTransport::tls() enables an encrypted
+  ("telnets") connection via stream_socket_enable_crypto; opt-in and
+  non-breaking, SocketTransport remains the default.
+- Added typed exceptions ConnectionException and ProtocolException (both extend
+  TelnetException).
+
+Tooling / tests
+- Added PHPUnit 11 (require-dev), phpunit.xml, and a tests/ suite covering the
+  IAC codec, the resumable parser, the RFC 1143 negotiation tables, client I/O
+  over in-memory/scripted transports, security properties, and the stream
+  transport (61 tests).
+- Added static analysis with PHPStan at level 8 (phpstan.neon), clean across the
+  whole codebase. This also fixed real issues it surfaced: dead unreachable
+  returns in OptionNegotiator, a redundant always-false errno comparison in
+  SocketTransport, non-positive read-length guards in both transports, and
+  precise value types on CommandSequence.
+- Added PHP_CodeSniffer with the PSR-12 standard (phpcs.xml); the codebase was
+  adapted to pass (explicit `public` constant visibility, import/spacing, line
+  length). Constants on Command/Option/Printer remain (not converted to enums).
+- Added composer scripts: `composer test`, `composer phpstan`, `composer phpcs`,
+  `composer phpcbf`, and `composer check` (runs all three).
+- Added GitHub Actions CI: phpunit (matrix PHP 8.2/8.3/8.4), phpstan, and phpcs
+  workflows, each running on push to develop/master and on pull requests.
+
+Documentation
+- Rewrote the README for the v2 API (correct method names, milliseconds
+  timelimit, real constructor signature, TLS, typed exceptions) and fixed the
+  stale/buggy examples it carried since v1.
+- Added an "Upgrading from v1 to v2" section documenting every behavioural
+  change (timelimit unit, IAC doubling, login() rewrite, awaitPrompt validation,
+  new composer requirements, ABORT_OUTPUT rename) with before/after guidance.
+
+
+v1.0.2 and earlier
+------------------
+See the git history and tags (v1.0.2, v1.0.1, v1.0.0). Release notes were not
+maintained in this file before v2.0.0.

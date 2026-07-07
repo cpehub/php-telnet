@@ -1,2 +1,5 @@
 /.devcontainer/
 vendor/
+.phpunit.cache/
+/RFC/
+/CLAUDE.md

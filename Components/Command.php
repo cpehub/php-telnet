@@ -1,56 +1,63 @@
 <?php
+
 namespace Cpehub\Telnet\Components;
 
 class Command
 {
-    /** Завершает согласование, начатое командой SB. */
-    const SE                = 0xF0;
-    /** Нет операции. */
-    const NOP               = 0xF1;
+    /** End of subnegotiation parameters (terminates a sequence started by SB). */
+    public const SE                = 0xF0;
+    /** No operation. */
+    public const NOP               = 0xF1;
     /**
-     * Синхронизация (Synch) обмена данными.
-     * Эта команда всегда сопровождается TCP Urgent notification.
-     * */
-    const DATA_MARK         = 0xF2;
-    /** Нажата кнопка «Break» или «Attention». */
-    const BREAK             = 0xF3;
-    /** Приостанавливает, прерывает, аварийно прекращает или завершает процесс. */
-    const INTERRUPT_PROCESS = 0xF4;
-    /**
-     * Подавление вывода текущего процесса.
-     * Также отправляет сигнал Synch пользователю.
+     * Data Mark: the synch marker in the data stream.
+     * This command is always accompanied by a TCP Urgent notification.
      */
-    const ABOUT_OUTPUT      = 0xF5;
-    /** Отправляет обратно ответ терминала, состоящий из печатных символов. */
-    const ARE_YOU_THERE    = 0xF6;
-    /** Получатель должен удалить предыдущий символ, если это возможно. */
-    const ERASE_CHARACTER   = 0xF7;
+    public const DATA_MARK         = 0xF2;
+    /** The "Break" or "Attention" key was pressed. */
+    public const BREAK             = 0xF3;
+    /** Suspend, interrupt, abort or terminate the running process. */
+    public const INTERRUPT_PROCESS = 0xF4;
     /**
-     * Стереть последнюю введённую строку, то есть все данные,
-     * полученные после последнего перевода строки.
+     * Abort Output: suppress the output of the current process.
+     * Also sends a Synch signal to the user.
      */
-    const ERASE_LINE        = 0xF8;
-    /** Ожидается передача данных. */
-    const GO_AHEAD          = 0xF9;
-    /** Начало согласования опции, требующего передачи параметров. */
-    const SB                = 0xFA;
+    public const ABORT_OUTPUT      = 0xF5;
     /**
-     * Указывает на желание исполнять или подтверждает,
-     * что сейчас исполняется указанная опция.
+     * Abort Output.
+     *
+     * @deprecated Misspelled historical alias. Use {@see Command::ABORT_OUTPUT} instead.
      */
-    const WILL              = 0xFB;
-    /** Указывает на отказ начать или продолжить исполнять указанную опцию. */
-    const WONT              = 0xFC;
+    public const ABOUT_OUTPUT      = 0xF5;
+    /** Are You There: request a visible response from the terminal. */
+    public const ARE_YOU_THERE     = 0xF6;
+    /** Erase Character: the receiver should delete the previous character if possible. */
+    public const ERASE_CHARACTER   = 0xF7;
     /**
-     * Запрос на то, чтобы другая сторона исполнила
-     * или подтвердила исполнение указанной опции.
+     * Erase Line: delete the last entered line, i.e. all data
+     * received since the last new line.
      */
-    const DO                = 0xFD;
+    public const ERASE_LINE        = 0xF8;
+    /** Go Ahead: the other end may now transmit. */
+    public const GO_AHEAD          = 0xF9;
+    /** Begin subnegotiation of an option that requires parameters. */
+    public const SB                = 0xFA;
     /**
-     * Требование на то, чтобы другая сторона остановила исполнение
-     * или подтвердила то, что указанная опция более не исполняется.
+     * Indicates the desire to begin performing, or confirms that it is now
+     * performing, the indicated option.
      */
-    const DONT              = 0xFE;
-    /** Interpret as Command. */
-    const IAC               = 0xFF;
+    public const WILL              = 0xFB;
+    /** Indicates the refusal to begin or to continue performing the indicated option. */
+    public const WONT              = 0xFC;
+    /**
+     * Requests that the other party begin performing, or confirms that it is
+     * expected to perform, the indicated option.
+     */
+    public const DO                = 0xFD;
+    /**
+     * Requests that the other party stop performing, or confirms that it is
+     * no longer performing, the indicated option.
+     */
+    public const DONT              = 0xFE;
+    /** Interpret As Command. */
+    public const IAC               = 0xFF;
 }
