@@ -51,4 +51,15 @@ interface TransportInterface
      * Whether the transport is currently open.
      */
     public function isConnected(): bool;
+
+    /**
+     * Probe whether the peer is still connected without sending or consuming any bytes.
+     *
+     * Combines a zero-timeout readability check with a non-destructive peek: a readable
+     * socket whose peek yields 0 bytes signals a closed/reset peer (dead); a socket that
+     * is not readable, or readable with bytes still pending, is alive.
+     *
+     * Distinct from {@see isConnected()}, which only reports whether the local handle is open.
+     */
+    public function isAlive(): bool;
 }

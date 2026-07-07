@@ -63,6 +63,11 @@ final class ScriptedTransport implements TransportInterface
         return $this->connected;
     }
 
+    public function isAlive(): bool
+    {
+        return $this->connected;
+    }
+
     public function allWritten(): string
     {
         return $this->written;

@@ -59,6 +59,11 @@ final class InMemoryTransport implements TransportInterface
         return $this->connected;
     }
 
+    public function isAlive(): bool
+    {
+        return $this->connected;
+    }
+
     /**
      * Server-side helper: queue more bytes for the client to read.
      */

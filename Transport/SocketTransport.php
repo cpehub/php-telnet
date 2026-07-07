@@ -128,6 +128,33 @@ final class SocketTransport implements TransportInterface
         return $this->socket instanceof Socket;
     }
 
+    public function isAlive(): bool
+    {
+        if (!$this->socket instanceof Socket) {
+            return false;
+        }
+
+        // Not readable within a zero-timeout select => open but idle.
+        if (!$this->waitReadable(0)) {
+            return true;
+        }
+
+        // Readable: peek a byte without consuming it. A readable socket that
+        // yields 0 bytes has been closed/reset by the peer.
+        $buffer = '';
+        $received = @socket_recv($this->socket, $buffer, 1, MSG_PEEK | MSG_DONTWAIT);
+        if ($received === false) {
+            $code = socket_last_error($this->socket);
+            socket_clear_error($this->socket);
+            // EAGAIN/EWOULDBLOCK: nothing pending after all, still alive.
+            $wouldBlock = array_unique([SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]);
+
+            return in_array($code, $wouldBlock, true);
+        }
+
+        return $received > 0;
+    }
+
     private function requireSocket(): Socket
     {
         if (!$this->socket instanceof Socket) {

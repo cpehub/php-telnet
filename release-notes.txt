@@ -6,8 +6,16 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
-v2.0.1 (unreleased)
+v2.1.0 (unreleased)
 -------------------
+
+Features
+- Added Client::isConnected() and TransportInterface::isAlive() — a non-consuming
+  select+peek liveness probe that reliably detects a reset/closed peer without
+  sending or consuming any data. Unlike a plain handle-open check, it performs a
+  zero-timeout select plus a non-destructive peek (MSG_PEEK / STREAM_PEEK), so a
+  half-closed/reset connection is detected and any pending output is left intact
+  for the next await/read.
 
 Tooling/tests
 - Fixed the PHPStan CI job, which failed because phpstan.neon excluded the
