@@ -28,15 +28,26 @@ class Client
         string $ip,
         int $port = 23,
         int $timelimit = 1, // 1 Second
-        LoggerInterface $logger = null
+        ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger;
         $this->timelimit = $timelimit * 1000; //TODO: Use milliseconds for more precision.
 
-        $this->socket = fsockopen($ip, $port);
-        $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        if ($socket === false) {
+            throw new TelnetException(
+                'Unable to create socket: ' . socket_strerror(socket_last_error())
+            );
+        }
+        $this->socket = $socket;
         socket_set_block($this->socket);
-        socket_connect($this->socket, $ip, $port);
+        if (socket_connect($this->socket, $ip, $port) === false) {
+            $error = socket_strerror(socket_last_error($this->socket));
+            socket_close($this->socket);
+            throw new TelnetException(
+                sprintf('Unable to connect to %s:%d: %s', $ip, $port, $error)
+            );
+        }
     }
 
     public function __destruct()
@@ -61,11 +72,11 @@ class Client
 
     public function setLogger(LoggerInterface $logger): self
     {
-        $this->setLogger($logger);
+        $this->logger = $logger;
         return $this;
     }
 
-    public function login(string $login, string $password, string $promptPattern = null): CommandSequence
+    public function login(string $login, string $password, ?string $promptPattern = null): CommandSequence
     {
         //set telnet connection options
         $sequence = new CommandSequence();
@@ -109,7 +120,7 @@ class Client
         return $this->awaitPrompt($promptPattern ?? $this->promptPattern);
     }
 
-    public function sendMessage(string $message, string $promptPattern = null, int $timelimit = null): string
+    public function sendMessage(string $message, ?string $promptPattern = null, ?int $timelimit = null): string
     {
         if (empty($timelimit)) {
             $timelimit = $this->timelimit;
@@ -141,7 +152,7 @@ class Client
         socket_write($this->socket, $sequence->compile());
     }
 
-    public function awaitSequence(CommandSequence $sequence, int $timelimit = null): CommandSequence
+    public function awaitSequence(CommandSequence $sequence, ?int $timelimit = null): CommandSequence
     {
         if (empty($timelimit)) {
             $timelimit = $this->timelimit;
@@ -183,7 +194,7 @@ class Client
         return $sequence;
     }
 
-    public function awaitPrompt(string $promptPattern = null, int $timelimit = null): CommandSequence
+    public function awaitPrompt(?string $promptPattern = null, ?int $timelimit = null): CommandSequence
     {
         if (empty($promptPattern)) {
             $promptPattern = $this->promptPattern;
@@ -202,7 +213,7 @@ class Client
         ) {
             usleep(self::READ_TIMEOUT);
             $res = socket_read($this->socket, self::BYTE_READ);
-            if (!empty($res !== false)) {
+            if ($res !== false && $res !== '') {
                 $this->buffer .= $res;
             }
             $counter++;

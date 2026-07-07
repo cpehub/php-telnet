@@ -1,2 +1,4 @@
 /.devcontainer/
 vendor/
+.phpunit.cache/
+/RFC/
