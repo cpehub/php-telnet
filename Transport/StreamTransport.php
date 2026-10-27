@@ -11,6 +11,9 @@ use Cpehub\Telnet\Exceptions\ConnectionException;
  *
  * Readiness is detected with stream_select(); reads are non-blocking so the
  * client's timed read loop stays in control of the deadline.
+ *
+ * A call interrupted by a signal (EINTR) is retried instead of failing the
+ * session — see SocketTransport for why this happens in queue workers.
  */
 final class StreamTransport implements TransportInterface
 {
@@ -99,20 +102,30 @@ final class StreamTransport implements TransportInterface
     public function waitReadable(int $timeoutMs): bool
     {
         $stream = $this->requireStream();
+        $deadline = $this->nowMs() + max(0, $timeoutMs);
+        $remainingMs = max(0, $timeoutMs);
 
-        $read = [$stream];
-        $write = null;
-        $except = null;
+        while (true) {
+            $read = [$stream];
+            $write = null;
+            $except = null;
 
-        $seconds = intdiv($timeoutMs, 1000);
-        $microseconds = ($timeoutMs % 1000) * 1000;
+            error_clear_last();
+            $ready = @stream_select($read, $write, $except, intdiv($remainingMs, 1000), ($remainingMs % 1000) * 1000);
+            if ($ready !== false) {
+                return $ready > 0;
+            }
 
-        $ready = @stream_select($read, $write, $except, $seconds, $microseconds);
-        if ($ready === false) {
-            throw new ConnectionException('stream_select failed.');
+            $error = $this->lastWarning();
+            if (!$this->isInterrupted($error)) {
+                throw new ConnectionException('stream_select failed' . ($error !== '' ? ': ' . $error : '.'));
+            }
+
+            $remainingMs = max(0, $deadline - $this->nowMs());
+            if ($remainingMs === 0) {
+                return false;
+            }
         }
-
-        return $ready > 0;
     }
 
     public function read(int $length): string
@@ -141,9 +154,14 @@ final class StreamTransport implements TransportInterface
         $remaining = strlen($data);
         $offset = 0;
         while ($remaining > 0) {
+            error_clear_last();
             $written = @fwrite($stream, substr($data, $offset), $remaining);
             if ($written === false || $written === 0) {
-                throw new ConnectionException('fwrite failed.');
+                $error = $this->lastWarning();
+                if ($this->isInterrupted($error)) {
+                    continue;
+                }
+                throw new ConnectionException('fwrite failed' . ($error !== '' ? ': ' . $error : '.'));
             }
             $offset += $written;
             $remaining -= $written;
@@ -182,6 +200,33 @@ final class StreamTransport implements TransportInterface
         }
 
         return true;
+    }
+
+    /**
+     * Message of the warning raised by the last suppressed stream call, or ''.
+     */
+    private function lastWarning(): string
+    {
+        return (string) (error_get_last()['message'] ?? '');
+    }
+
+    /**
+     * Streams expose no errno: an interrupted call is recognized by the
+     * "Interrupted system call" (EINTR) text PHP puts in the warning.
+     */
+    private function isInterrupted(string $warning): bool
+    {
+        return stripos($warning, 'Interrupted system call') !== false;
+    }
+
+    /**
+     * Monotonic clock in milliseconds (not affected by wall-clock changes).
+     */
+    private function nowMs(): int
+    {
+        [$seconds, $nanoseconds] = hrtime();
+
+        return $seconds * 1000 + intdiv($nanoseconds, 1_000_000);
     }
 
     /**
