@@ -6,6 +6,28 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
+v2.2.1 (2026-10-27)
+-------------------
+
+Fixes
+- A system call interrupted by a signal (EINTR) no longer ends the session.
+  socket_select()/stream_select() are retried with the remaining time of the
+  same deadline, and socket_read()/socket_write()/fwrite() retry the
+  interrupted call. Queue workers enable pcntl_async_signals(), so a SIGTERM
+  sent by a supervisor scaling down (Laravel Horizon autoscaling), a pause or
+  continue signal, or a SIGALRM, used to fail long reads in the middle with
+  "socket_select failed: No error information" (musl) / "... Success" (glibc).
+- Transport errors now report the real cause: SocketTransport reads the global
+  socket error (where socket_select() records it) before the per-socket one,
+  and StreamTransport includes PHP's warning text instead of a bare
+  "stream_select failed.".
+
+Tooling/tests
+- tests/Integration/SignalInterruptionTest.php: real loopback connections for
+  both transports and the Client, with a forked child delivering a signal in
+  the middle of the wait (skipped without ext-pcntl/ext-posix).
+
+
 v2.2.0 (2026-07-07)
 -------------------
 
