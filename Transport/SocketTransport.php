@@ -10,6 +10,11 @@ use Socket;
  *
  * Uses socket_select() to wait for readability instead of busy-polling, and
  * loops over partial writes so a short socket_write does not silently drop data.
+ *
+ * A system call interrupted by a signal (EINTR) is retried instead of failing the
+ * session. Queue workers enable async signals (pcntl_async_signals), so a SIGTERM
+ * sent by a supervisor scaling down, or a SIGALRM, lands in the middle of
+ * socket_select() and makes it return false although the connection is fine.
  */
 final class SocketTransport implements TransportInterface
 {
@@ -55,22 +60,31 @@ final class SocketTransport implements TransportInterface
     public function waitReadable(int $timeoutMs): bool
     {
         $socket = $this->requireSocket();
+        $deadline = $this->nowMs() + max(0, $timeoutMs);
+        $remainingMs = max(0, $timeoutMs);
 
-        $read = [$socket];
-        $write = null;
-        $except = null;
+        while (true) {
+            $read = [$socket];
+            $write = null;
+            $except = null;
 
-        $seconds = intdiv($timeoutMs, 1000);
-        $microseconds = ($timeoutMs % 1000) * 1000;
+            socket_clear_error();
+            $ready = @socket_select($read, $write, $except, intdiv($remainingMs, 1000), ($remainingMs % 1000) * 1000);
+            if ($ready !== false) {
+                return $ready > 0;
+            }
 
-        $ready = @socket_select($read, $write, $except, $seconds, $microseconds);
-        if ($ready === false) {
-            throw new ConnectionException(
-                'socket_select failed: ' . socket_strerror(socket_last_error($socket))
-            );
+            $code = $this->lastErrorCode($socket);
+            if ($code !== SOCKET_EINTR) {
+                throw new ConnectionException('socket_select failed: ' . socket_strerror($code));
+            }
+
+            $this->clearErrors($socket);
+            $remainingMs = max(0, $deadline - $this->nowMs());
+            if ($remainingMs === 0) {
+                return false;
+            }
         }
-
-        return $ready > 0;
     }
 
     public function read(int $length): string
@@ -81,14 +95,17 @@ final class SocketTransport implements TransportInterface
 
         $socket = $this->requireSocket();
 
+        socket_clear_error();
         $data = @socket_read($socket, $length, PHP_BINARY_READ);
         if ($data === false) {
-            $code = socket_last_error($socket);
-            // EAGAIN/EWOULDBLOCK: nothing to read right now, not a hard error.
-            // (On Linux both constants are 11; on some platforms they differ.)
-            $wouldBlock = array_unique([SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]);
-            if (in_array($code, $wouldBlock, true)) {
-                socket_clear_error($socket);
+            $code = $this->lastErrorCode($socket);
+            // EAGAIN/EWOULDBLOCK: nothing to read right now; EINTR: a signal
+            // interrupted the call. Neither is a hard error — the caller's read
+            // loop simply tries again. (On Linux EAGAIN and EWOULDBLOCK are both
+            // 11; on some platforms they differ.)
+            $retryable = array_unique([SOCKET_EAGAIN, SOCKET_EWOULDBLOCK, SOCKET_EINTR]);
+            if (in_array($code, $retryable, true)) {
+                $this->clearErrors($socket);
                 return '';
             }
             throw new ConnectionException('socket_read failed: ' . socket_strerror($code));
@@ -104,11 +121,15 @@ final class SocketTransport implements TransportInterface
         $remaining = strlen($data);
         $offset = 0;
         while ($remaining > 0) {
+            socket_clear_error();
             $written = @socket_write($socket, substr($data, $offset), $remaining);
             if ($written === false) {
-                throw new ConnectionException(
-                    'socket_write failed: ' . socket_strerror(socket_last_error($socket))
-                );
+                $code = $this->lastErrorCode($socket);
+                if ($code === SOCKET_EINTR) {
+                    $this->clearErrors($socket);
+                    continue;
+                }
+                throw new ConnectionException('socket_write failed: ' . socket_strerror($code));
             }
             $offset += $written;
             $remaining -= $written;
@@ -153,6 +174,37 @@ final class SocketTransport implements TransportInterface
         }
 
         return $received > 0;
+    }
+
+    /**
+     * Error code of the last failed call on this socket.
+     *
+     * socket_select() reports its failure only through the global error (it
+     * operates on a set of sockets), so the per-socket code reads 0 — which musl
+     * renders as "No error information", hiding the real cause. The global code
+     * is checked first and the per-socket one is the fallback.
+     */
+    private function lastErrorCode(Socket $socket): int
+    {
+        $global = socket_last_error();
+
+        return $global !== 0 ? $global : socket_last_error($socket);
+    }
+
+    private function clearErrors(Socket $socket): void
+    {
+        socket_clear_error();
+        socket_clear_error($socket);
+    }
+
+    /**
+     * Monotonic clock in milliseconds (not affected by wall-clock changes).
+     */
+    private function nowMs(): int
+    {
+        [$seconds, $nanoseconds] = hrtime();
+
+        return $seconds * 1000 + intdiv($nanoseconds, 1_000_000);
     }
 
     private function requireSocket(): Socket
