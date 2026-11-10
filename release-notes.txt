@@ -6,6 +6,30 @@ at the top. When cutting a release, its section here is used as the body of the
 GitHub Release (gh release create ... -F release-notes.txt section).
 
 
+v2.3.0 (2026-11-10)
+-------------------
+
+Fixes
+- SocketTransport::connect() no longer hangs on a host that silently drops
+  packets. The blocking socket_connect() had no timeout, so it waited for the
+  kernel to give up (about two minutes on Linux) - longer than the callers'
+  own deadline: a queue worker checking an unreachable OLT was held until its
+  job timeout killed it. The connect is now non-blocking and bounded by
+  socket_select(); past the limit it throws ConnectionException
+  "Unable to connect to host:port: connection timed out after N s", the same
+  exception already raised for "Host is unreachable" / "Connection refused".
+
+Features
+- SocketTransport takes a third constructor argument, $connectTimeoutMs
+  (default SocketTransport::DEFAULT_CONNECT_TIMEOUT_MS = 10 000 ms). Client is
+  unchanged and inherits the default.
+
+Tooling/tests
+- tests/Integration/SocketTransportConnectTimeoutTest.php: loopback connect
+  stays usable (blocking again), an unanswered connect is cut at the limit,
+  and a closed port still fails immediately.
+
+
 v2.2.1 (2026-10-27)
 -------------------
 
