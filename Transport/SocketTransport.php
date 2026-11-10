@@ -18,17 +18,35 @@ use Socket;
  */
 final class SocketTransport implements TransportInterface
 {
+    /**
+     * Default time allowed for the TCP handshake, in milliseconds.
+     *
+     * A blocking socket_connect() has no timeout of its own: against a host that
+     * silently drops packets it waits for the kernel to give up (about two
+     * minutes on Linux), which is longer than most callers' own deadline.
+     */
+    public const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+
     private ?Socket $socket = null;
 
+    /**
+     * @param int $connectTimeoutMs Time allowed for the TCP handshake, in milliseconds.
+     */
     public function __construct(
         private readonly string $host,
-        private readonly int $port = 23
+        private readonly int $port = 23,
+        private readonly int $connectTimeoutMs = self::DEFAULT_CONNECT_TIMEOUT_MS
     ) {
         if ($this->host === '') {
             throw new ConnectionException('Telnet host must not be empty.');
         }
         if ($this->port < 1 || $this->port > 65535) {
             throw new ConnectionException(sprintf('Invalid telnet port: %d.', $this->port));
+        }
+        if ($this->connectTimeoutMs < 1) {
+            throw new ConnectionException(
+                sprintf('Invalid connect timeout: %d ms.', $this->connectTimeoutMs)
+            );
         }
     }
 
@@ -45,16 +63,70 @@ final class SocketTransport implements TransportInterface
             );
         }
 
-        socket_set_block($socket);
+        // Non-blocking connect bounded by socket_select(): a blocking connect to a
+        // host that drops packets would hang until the kernel times out.
+        socket_set_nonblock($socket);
+        socket_clear_error();
         if (@socket_connect($socket, $this->host, $this->port) === false) {
-            $error = socket_strerror(socket_last_error($socket));
-            socket_close($socket);
-            throw new ConnectionException(
-                sprintf('Unable to connect to %s:%d: %s', $this->host, $this->port, $error)
-            );
+            $code = socket_last_error($socket);
+            $pending = array_unique([SOCKET_EINPROGRESS, SOCKET_EALREADY, SOCKET_EINTR]);
+            if (!in_array($code, $pending, true)) {
+                $this->failConnect($socket, socket_strerror($code));
+            }
+            $this->clearErrors($socket);
+            $this->awaitConnected($socket);
         }
+        socket_set_block($socket);
 
         $this->socket = $socket;
+    }
+
+    /**
+     * Wait for a pending non-blocking connect to finish, within the connect timeout.
+     */
+    private function awaitConnected(Socket $socket): void
+    {
+        $deadline = $this->nowMs() + $this->connectTimeoutMs;
+        $remainingMs = $this->connectTimeoutMs;
+
+        while (true) {
+            $read = null;
+            $write = [$socket];
+            $except = null;
+
+            socket_clear_error();
+            $ready = @socket_select($read, $write, $except, intdiv($remainingMs, 1000), ($remainingMs % 1000) * 1000);
+            if ($ready === false) {
+                $code = $this->lastErrorCode($socket);
+                if ($code !== SOCKET_EINTR) {
+                    $this->failConnect($socket, 'socket_select failed: ' . socket_strerror($code));
+                }
+                $this->clearErrors($socket);
+            } elseif ($ready > 0) {
+                // Writable means the handshake ended; SO_ERROR says how.
+                $error = socket_get_option($socket, SOL_SOCKET, SO_ERROR);
+                if ($error !== 0) {
+                    $this->failConnect($socket, socket_strerror(is_int($error) ? $error : SOCKET_ECONNREFUSED));
+                }
+
+                return;
+            }
+
+            $remainingMs = max(0, $deadline - $this->nowMs());
+            if ($remainingMs === 0) {
+                $seconds = rtrim(rtrim(number_format($this->connectTimeoutMs / 1000, 1, '.', ''), '0'), '.');
+                $this->failConnect($socket, sprintf('connection timed out after %s s', $seconds));
+            }
+        }
+    }
+
+    private function failConnect(Socket $socket, string $reason): never
+    {
+        socket_close($socket);
+
+        throw new ConnectionException(
+            sprintf('Unable to connect to %s:%d: %s', $this->host, $this->port, $reason)
+        );
     }
 
     public function waitReadable(int $timeoutMs): bool
